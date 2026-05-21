@@ -15,25 +15,25 @@ export type TournamentCreatorRequestStatus =
 
 export type Profile = {
   id: string
-  user_id: string
+  email: string | null
   display_name: string
-  role: UserRole
   ra: string | null
   avatar_key: AvatarKey
-  can_create_tournaments: boolean
+  role: UserRole
   created_at: string
   updated_at: string
 }
 
 export type TournamentCreatorRequest = {
   id: string
-  requester_id: string
+  user_id: string
+  reason: string
   status: TournamentCreatorRequestStatus
-  reason: string | null
-  decided_by: string | null
-  decision_reason: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  admin_notes: string | null
   created_at: string
-  decided_at: string | null
+  updated_at: string
 }
 
 export type Database = {
@@ -41,19 +41,37 @@ export type Database = {
     Tables: {
       profiles: {
         Row: Profile
-        Insert: Omit<Profile, 'created_at' | 'updated_at'>
-        Update: Partial<Omit<Profile, 'id' | 'user_id' | 'created_at'>>
+        Insert: Partial<Omit<Profile, 'created_at' | 'updated_at'>> &
+          Pick<Profile, 'id'>
+        Update: Partial<
+          Pick<Profile, 'display_name' | 'ra' | 'avatar_key' | 'role' | 'email'>
+        >
+        Relationships: []
       }
       tournament_creator_requests: {
         Row: TournamentCreatorRequest
-        Insert: Omit<TournamentCreatorRequest, 'id' | 'created_at' | 'decided_at'>
+        Insert: Pick<TournamentCreatorRequest, 'user_id' | 'reason'> &
+          Partial<
+            Pick<
+              TournamentCreatorRequest,
+              'status' | 'reviewed_by' | 'reviewed_at' | 'admin_notes'
+            >
+          >
         Update: Partial<
           Pick<
             TournamentCreatorRequest,
-            'status' | 'decided_by' | 'decision_reason' | 'decided_at'
+            'status' | 'reviewed_by' | 'reviewed_at' | 'admin_notes'
           >
         >
+        Relationships: []
       }
     }
+    Views: Record<string, never>
+    Functions: Record<string, never>
+    Enums: {
+      user_role: UserRole
+      request_status: TournamentCreatorRequestStatus
+    }
+    CompositeTypes: Record<string, never>
   }
 }

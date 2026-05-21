@@ -1,12 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types'
 
-const requiredEnvNames = [
-  'VITE_SUPABASE_URL',
-  'VITE_SUPABASE_ANON_KEY',
-] as const
-
-type SupabaseEnvName = (typeof requiredEnvNames)[number]
+type SupabaseEnvName = 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'
 
 function readRequiredEnv(name: SupabaseEnvName) {
   const value = import.meta.env[name]

@@ -27,6 +27,16 @@ import {
   type Tournament,
   type TournamentStatus,
 } from './data/mockData'
+import { AdminRoute } from './components/auth/AdminRoute'
+import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { UserMenu } from './components/auth/UserMenu'
+import { AuthProvider } from './context/AuthContext'
+import { AccessDeniedPage } from './pages/auth/AccessDeniedPage'
+import { AdminHomePage } from './pages/auth/AdminHomePage'
+import { LoginPage } from './pages/auth/LoginPage'
+import { MyAccountPage } from './pages/auth/MyAccountPage'
+import { PasswordRecoveryPage } from './pages/auth/PasswordRecoveryPage'
+import { RegisterPage } from './pages/auth/RegisterPage'
 
 type PageId =
   | 'home'
@@ -70,6 +80,53 @@ const matchStatusText: Record<MatchStatus, string> = {
 }
 
 function App() {
+  return (
+    <AuthProvider>
+      <AppRouter />
+    </AuthProvider>
+  )
+}
+
+function AppRouter() {
+  const [route, setRoute] = useState(() => window.location.hash.replace(/^#/, '') || 'home')
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setRoute(window.location.hash.replace(/^#/, '') || 'home')
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
+
+  switch (route) {
+    case '/login':
+      return <LoginPage />
+    case '/cadastro':
+      return <RegisterPage />
+    case '/recuperar-senha':
+      return <PasswordRecoveryPage />
+    case '/perfil':
+    case '/minha-conta':
+      return (
+        <ProtectedRoute>
+          <MyAccountPage />
+        </ProtectedRoute>
+      )
+    case '/admin':
+      return (
+        <AdminRoute>
+          <AdminHomePage />
+        </AdminRoute>
+      )
+    case '/acesso-negado':
+      return <AccessDeniedPage />
+    default:
+      return <TournamentDemoApp />
+  }
+}
+
+function TournamentDemoApp() {
   const [activePage, setActivePage] = useState<PageId>('home')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -269,6 +326,8 @@ function App() {
             Novo torneio
           </button>
         </nav>
+
+        <UserMenu />
       </header>
 
       <main className="app-main">{renderPage()}</main>
