@@ -67,7 +67,18 @@ export type Database = {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      can_create_tournaments: {
+        Args: {
+          target_user_id?: string
+        }
+        Returns: boolean
+      }
+      is_admin: {
+        Args: Record<string, never>
+        Returns: boolean
+      }
+    }
     Enums: {
       user_role: UserRole
       request_status: TournamentCreatorRequestStatus

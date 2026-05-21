@@ -7,9 +7,11 @@ export type AuthContextValue = {
   user: User | null
   profile: Profile | null
   isAdmin: boolean
+  canCreateTournaments: boolean
   isLoading: boolean
   profileError: string
   refreshProfile: () => Promise<Profile | null>
+  refreshCreatorPermission: () => Promise<boolean>
   signOut: () => Promise<void>
 }
 

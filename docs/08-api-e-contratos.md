@@ -54,11 +54,12 @@ Quando Supabase for implementado:
 - **Validações:** usuário autenticado; justificativa presente; não há pedido pendente duplicado.
 - **Erros possíveis:** `DUPLICATED_PENDING_REQUEST`, `VALIDATION_ERROR`, `PERMISSION_DENIED`.
 - **Permissões:** usuário comum autenticado.
+- **Decisão de autorização:** a permissão de criar torneios é derivada de pedido `approved` em `tournament_creator_requests` ou de `role = admin`. Isso deve ser validado no banco por função segura como `public.can_create_tournaments()`, sem transformar o usuário aprovado em admin global.
 
 ## Decidir pedido de permissão
 
 - **Ação:** `decideTournamentCreatorRequest`
-- **Entrada:** `{ requestId, decision: "approved" | "rejected", decisionReason }`
+- **Entrada:** `{ requestId, decision: "approved" | "rejected", adminNotes }`
 - **Saída:** `{ request, profile, auditLog }`
 - **Validações:** pedido pendente; justificativa da decisão; admin autenticado.
 - **Erros possíveis:** `NOT_FOUND`, `REQUEST_ALREADY_DECIDED`, `PERMISSION_DENIED`.

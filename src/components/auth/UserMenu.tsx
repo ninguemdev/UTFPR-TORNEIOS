@@ -44,6 +44,9 @@ export function UserMenu() {
           Admin
         </a>
       )}
+      <a className="button button-secondary" href="#/meus-pedidos">
+        Pedidos
+      </a>
       <LogoutButton />
     </div>
   )

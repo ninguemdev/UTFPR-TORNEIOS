@@ -31,11 +31,15 @@ import { AdminRoute } from './components/auth/AdminRoute'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { UserMenu } from './components/auth/UserMenu'
 import { AuthProvider } from './context/AuthContext'
+import { useAuth } from './context/auth'
 import { AccessDeniedPage } from './pages/auth/AccessDeniedPage'
+import { AdminCreatorRequestsPage } from './pages/auth/AdminCreatorRequestsPage'
 import { AdminHomePage } from './pages/auth/AdminHomePage'
 import { LoginPage } from './pages/auth/LoginPage'
+import { MyCreatorRequestsPage } from './pages/auth/MyCreatorRequestsPage'
 import { MyAccountPage } from './pages/auth/MyAccountPage'
 import { PasswordRecoveryPage } from './pages/auth/PasswordRecoveryPage'
+import { RequestTournamentCreatorPage } from './pages/auth/RequestTournamentCreatorPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
 
 type PageId =
@@ -119,6 +123,24 @@ function AppRouter() {
           <AdminHomePage />
         </AdminRoute>
       )
+    case '/admin/pedidos':
+      return (
+        <AdminRoute>
+          <AdminCreatorRequestsPage />
+        </AdminRoute>
+      )
+    case '/solicitar-criacao-torneio':
+      return (
+        <ProtectedRoute>
+          <RequestTournamentCreatorPage />
+        </ProtectedRoute>
+      )
+    case '/meus-pedidos':
+      return (
+        <ProtectedRoute>
+          <MyCreatorRequestsPage />
+        </ProtectedRoute>
+      )
     case '/acesso-negado':
       return <AccessDeniedPage />
     default:
@@ -127,6 +149,7 @@ function AppRouter() {
 }
 
 function TournamentDemoApp() {
+  const { session, canCreateTournaments } = useAuth()
   const [activePage, setActivePage] = useState<PageId>('home')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -175,6 +198,12 @@ function TournamentDemoApp() {
   }, [])
 
   function navigateTo(page: PageId) {
+    if (page === 'create' && !canCreateTournaments) {
+      window.location.hash = session ? '#/solicitar-criacao-torneio' : '#/login'
+      setIsMobileMenuOpen(false)
+      return
+    }
+
     setActivePage(page)
     setIsMobileMenuOpen(false)
   }

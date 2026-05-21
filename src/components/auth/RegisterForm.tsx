@@ -25,11 +25,12 @@ export function RegisterForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const form = event.currentTarget
     setError('')
     setSuccess('')
     setIsSubmitting(true)
 
-    const formData = new FormData(event.currentTarget)
+    const formData = new FormData(form)
     const email = String(formData.get('email') ?? '').trim()
     const password = String(formData.get('password') ?? '')
     const displayName = String(formData.get('display_name') ?? '').trim()
@@ -63,7 +64,7 @@ export function RegisterForm() {
       return
     }
 
-    event.currentTarget.reset()
+    form.reset()
     setAvatarKey('avatar_utfpr_blue')
     setSuccess(
       data.session

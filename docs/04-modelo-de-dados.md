@@ -35,7 +35,7 @@ Observação: a tabela `auth.users` é gerenciada pelo Supabase. O projeto não 
 | role | enum | Sim | - | `admin` ou `user`. Usuários comuns não podem alterar este campo. |
 | ra | string | Opcional | - | Registro acadêmico informado pelo usuário. Não deve ser exposto publicamente por padrão. |
 | avatar_key | string | Sim | - | Chave de avatar pré-definido. Upload de foto não faz parte do MVP. |
-| can_create_tournaments | boolean | Sim | Tournament | Permissão derivada/aprovada para criar torneios. |
+| can_create_tournaments | boolean derivado | Não persistido | Tournament | Permissão calculada por `public.can_create_tournaments()`: admin global ou usuário com pedido `approved`. |
 | createdAt | timestamptz | Sim | - | Data de criação do perfil. |
 | updatedAt | timestamptz | Sim | - | Data da última atualização. |
 
@@ -322,8 +322,9 @@ Observação: a tabela `auth.users` é gerenciada pelo Supabase. O projeto não 
 - Chave publicada não deve ser regenerada sem registrar auditoria.
 - `profiles.role` só pode ser alterado por admin ou processo seguro de seed/migração.
 - `profiles.avatar_key` deve aceitar apenas chaves cadastradas na lista de avatares permitidos.
-- Usuário comum só pode atualizar o próprio perfil e não pode mudar `role` nem `can_create_tournaments`.
-- Criação de torneio exige `role = admin` ou `can_create_tournaments = true`.
+- Usuário comum só pode atualizar o próprio perfil e não pode mudar `role` nem conceder a si mesmo permissão de organizador.
+- Criação de torneio exige `role = admin` ou permissão derivada de pedido `approved` em `tournament_creator_requests`.
+- Usuário aprovado para criar torneios não vira admin global; a decisão deve ser consultada por função segura como `public.can_create_tournaments()`.
 - Alteração de torneio em andamento/encerrado exige admin ou regra explícita registrada.
 - Correção de resultado confirmado exige auditoria e permissão validada no banco.
 
@@ -366,7 +367,7 @@ Observação: a tabela `auth.users` é gerenciada pelo Supabase. O projeto não 
 
 Todas as tabelas importantes devem ter RLS habilitado. Policies iniciais recomendadas:
 
-- `profiles`: usuário autenticado lê perfis públicos necessários; atualiza apenas o próprio perfil; apenas admin altera `role` e `can_create_tournaments`.
+- `profiles`: usuário autenticado lê perfis públicos necessários; atualiza apenas o próprio perfil; apenas admin altera `role`.
 - `tournament_creator_requests`: usuário cria e lê os próprios pedidos; admin lê todos e decide.
 - `global_settings`: leitura conforme necessidade pública; escrita apenas para admin.
 - `tournaments`: visitantes leem torneios publicados; usuário autorizado cria/edita seus torneios em estados permitidos; admin lê e altera todos.

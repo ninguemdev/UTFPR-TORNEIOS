@@ -31,8 +31,37 @@ function getReadableAuthError(message: string) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [hasApprovedCreatorRequest, setHasApprovedCreatorRequest] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [profileError, setProfileError] = useState('')
+
+  const refreshCreatorPermission = useCallback(async () => {
+    const {
+      data: { session: currentSession },
+    } = await supabase.auth.getSession()
+    const currentUser = currentSession?.user ?? null
+
+    if (!currentUser) {
+      setHasApprovedCreatorRequest(false)
+      return false
+    }
+
+    const { data, error } = await supabase
+      .from('tournament_creator_requests')
+      .select('id')
+      .eq('user_id', currentUser.id)
+      .eq('status', 'approved')
+      .limit(1)
+
+    if (error) {
+      setHasApprovedCreatorRequest(false)
+      return false
+    }
+
+    const isApproved = data.length > 0
+    setHasApprovedCreatorRequest(isApproved)
+    return isApproved
+  }, [])
 
   const refreshProfile = useCallback(async () => {
     const {
@@ -60,8 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setProfile(data)
     setProfileError('')
+    await refreshCreatorPermission()
     return data
-  }, [])
+  }, [refreshCreatorPermission])
 
   useEffect(() => {
     let isMounted = true
@@ -91,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(nextSession)
       if (!nextSession) {
         setProfile(null)
+        setHasApprovedCreatorRequest(false)
         setProfileError('')
         return
       }
@@ -113,21 +144,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setSession(null)
     setProfile(null)
+    setHasApprovedCreatorRequest(false)
     window.location.hash = '#/login'
   }
+
+  const isAdmin = profile?.role === 'admin'
 
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       user: session?.user ?? null,
       profile,
-      isAdmin: profile?.role === 'admin',
+      isAdmin,
+      canCreateTournaments: isAdmin || hasApprovedCreatorRequest,
       isLoading,
       profileError,
       refreshProfile,
+      refreshCreatorPermission,
       signOut,
     }),
-    [isLoading, profile, profileError, refreshProfile, session],
+    [
+      hasApprovedCreatorRequest,
+      isAdmin,
+      isLoading,
+      profile,
+      profileError,
+      refreshCreatorPermission,
+      refreshProfile,
+      session,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

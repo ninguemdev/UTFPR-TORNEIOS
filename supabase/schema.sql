@@ -159,6 +159,35 @@ comment on function public.is_admin() is
 revoke all on function public.is_admin() from public;
 grant execute on function public.is_admin() to authenticated;
 
+-- Verifica se o usuÃ¡rio pode criar torneios.
+-- DecisÃ£o de modelagem: no MVP a permissÃ£o de organizador Ã© derivada de
+-- ao menos um pedido aprovado em tournament_creator_requests. Isso evita
+-- confundir organizador aprovado com admin global e permite auditar quando a
+-- permissÃ£o foi concedida. Policies futuras de tournaments devem chamar esta
+-- funÃ§Ã£o, nÃ£o confiar apenas no front-end.
+create or replace function public.can_create_tournaments(target_user_id uuid default auth.uid())
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    public.is_admin()
+    or exists (
+      select 1
+      from public.tournament_creator_requests
+      where user_id = target_user_id
+        and status = 'approved'::public.request_status
+    );
+$$;
+
+comment on function public.can_create_tournaments(uuid) is
+  'Retorna true para admin global ou usuÃ¡rio com pedido approved. NÃ£o altera role.';
+
+revoke all on function public.can_create_tournaments(uuid) from public;
+grant execute on function public.can_create_tournaments(uuid) to authenticated;
+
 -- Protege campos sensíveis do profile.
 -- Usuários comuns podem atualizar dados próprios de perfil, mas não role nem email.
 -- Admins podem alterar profiles, inclusive role, desde que passem pelas policies.

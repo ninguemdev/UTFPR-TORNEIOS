@@ -1,7 +1,7 @@
 import { ProfileForm } from '../../components/auth/ProfileForm'
-import { UserMenu } from '../../components/auth/UserMenu'
 import { useAuth } from '../../context/auth'
 import { getAvatarOption } from '../../components/auth/avatarOptions'
+import { AuthenticatedShell } from '../../components/layout/AuthenticatedShell'
 
 export function MyAccountPage() {
   const { profile, profileError, isAdmin } = useAuth()
@@ -20,58 +20,43 @@ export function MyAccountPage() {
   const avatar = getAvatarOption(profile.avatar_key)
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <a className="brand" href="#home">
-          <span className="brand-mark" aria-hidden="true">
-            UT
-          </span>
-          <span>
-            <span className="brand-title">UTFPR Torneios</span>
-            <span className="brand-subtitle">Minha conta</span>
-          </span>
-        </a>
-        <UserMenu />
-      </header>
+    <AuthenticatedShell subtitle="Minha conta">
+      <div className="page-stack">
+        <section className="page-header" aria-labelledby="account-title">
+          <div>
+            <span className="eyebrow">Conta e perfil</span>
+            <h1 id="account-title">Minha conta</h1>
+            <p>
+              Edite seus dados de perfil. Email e papel global são protegidos
+              pelo banco e não podem ser alterados por usuário comum.
+            </p>
+          </div>
+        </section>
 
-      <main className="app-main">
-        <div className="page-stack">
-          <section className="page-header" aria-labelledby="account-title">
+        <section className="account-grid">
+          <article className="surface-panel profile-summary">
+            <span className={`profile-avatar profile-avatar-large avatar-tone-${avatar.tone}`} aria-hidden="true">
+              {avatar.initials}
+            </span>
             <div>
-              <span className="eyebrow">Conta e perfil</span>
-              <h1 id="account-title">Minha conta</h1>
-              <p>
-                Edite seus dados de perfil. Email e papel global são protegidos
-                pelo banco e não podem ser alterados por usuário comum.
-              </p>
+              <h2>{profile.display_name}</h2>
+              <p>{profile.email}</p>
             </div>
-          </section>
-
-          <section className="account-grid">
-            <article className="surface-panel profile-summary">
-              <span className={`profile-avatar profile-avatar-large avatar-tone-${avatar.tone}`} aria-hidden="true">
-                {avatar.initials}
-              </span>
+            <dl className="definition-grid">
               <div>
-                <h2>{profile.display_name}</h2>
-                <p>{profile.email}</p>
+                <dt>RA</dt>
+                <dd>{profile.ra || 'Não informado'}</dd>
               </div>
-              <dl className="definition-grid">
-                <div>
-                  <dt>RA</dt>
-                  <dd>{profile.ra || 'Não informado'}</dd>
-                </div>
-                <div>
-                  <dt>Papel</dt>
-                  <dd>{isAdmin ? 'Admin' : 'User'}</dd>
-                </div>
-              </dl>
-            </article>
+              <div>
+                <dt>Papel</dt>
+                <dd>{isAdmin ? 'Admin' : 'User'}</dd>
+              </div>
+            </dl>
+          </article>
 
-            <ProfileForm key={profile.updated_at} profile={profile} />
-          </section>
-        </div>
-      </main>
-    </div>
+          <ProfileForm key={profile.updated_at} profile={profile} />
+        </section>
+      </div>
+    </AuthenticatedShell>
   )
 }
