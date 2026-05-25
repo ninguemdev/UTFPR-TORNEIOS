@@ -194,3 +194,13 @@ Prioridades:
 | RF-076 | Permitir envio de equipe para inscrição. | MVP | RPC cria `tournament_registrations` com `registration_type = team`, `team_id` e status `pending`. |
 | RF-077 | Sincronizar decisão da inscrição com status da equipe. | MVP | Confirmação, rejeição ou cancelamento administrativo atualiza `teams.status` sem apagar histórico. |
 | RF-078 | Permitir gestão de equipes por admin, organizador do torneio e capitão dentro das regras. | MVP | RLS bloqueia edição de equipe alheia por usuário comum. |
+
+## Atualizacao: resultados de partidas
+
+| Codigo | Descricao | Prioridade | Criterio de aceite |
+| --- | --- | --- | --- |
+| RF-079 | Registrar resultado de partida de mata-mata simples. | MVP | Admin ou organizador informa placar dos dois lados; o banco valida vencedor, empate e placar negativo. |
+| RF-080 | Avancar vencedor confirmado na chave. | MVP | Resultado confirmado atualiza `bracket_matches` e alimenta `next_match_id` no slot correto. |
+| RF-081 | Permitir contestacao por participante. | MVP | Participante autenticado da partida muda o resultado para `disputed` com motivo registrado. |
+| RF-082 | Resolver contestacao administrativamente. | MVP | Admin ou organizador confirma o resultado contestado ou cancela o resultado para novo lancamento. |
+| RF-083 | Auditar alteracoes de resultado. | MVP | Criacao, correcao, contestacao e resolucao criam linha em `match_result_history`. |

@@ -347,3 +347,18 @@ Quando Supabase for implementado:
 - **Ação:** `generateTournamentBracket` com `forceRegenerate = true`.
 - **Efeito:** remove `tournament_brackets` existente; `bracket_matches` cai por cascade; nova estrutura é salva.
 - **UX obrigatória:** confirmação clara antes da chamada, avisando perda/alteração de dados.
+
+## Atualizacao: contratos de resultados
+
+RPCs novas ou atualizadas:
+
+- `record_bracket_match_result(match_id, winner_registration_id, score_a, score_b, notes, change_reason)`: registra ou corrige resultado, cria historico e avanca vencedor.
+- `complete_bracket_match(...)`: alias de compatibilidade para resultado simples sem observacao.
+- `contest_match_result(match_id, reason)`: participante da partida abre contestacao.
+- `resolve_match_dispute(match_id, action, notes)`: admin/organizador confirma ou cancela resultado contestado.
+- `is_match_participant(match_id)`: helper de permissao para RLS e contestacao.
+
+Consultas:
+
+- `match_results` pode ser lido publicamente em torneios publicados.
+- `match_result_history` e restrito a gestor ou participante autenticado da partida.

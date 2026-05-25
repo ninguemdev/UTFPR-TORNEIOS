@@ -2,6 +2,8 @@ import { supabase } from '../lib/supabase/client'
 import type {
   BracketMatch,
   BracketSeedingMethod,
+  MatchResult,
+  MatchResultHistory,
   Tournament,
   TournamentBracket,
   TournamentRegistration,
@@ -16,6 +18,7 @@ import { publicParticipantStatuses } from './tournaments'
 export type TournamentBracketWithMatches = {
   bracket: TournamentBracket
   matches: BracketMatch[]
+  resultsByMatchId: Record<string, MatchResult>
   participantsById: Record<string, TournamentRegistration>
 }
 
@@ -34,6 +37,13 @@ export const bracketMatchStatusLabels: Record<BracketMatch['status'], string> = 
   cancelled: 'Cancelada',
 }
 
+export const matchResultStatusLabels: Record<MatchResult['status'], string> = {
+  confirmed: 'Confirmado',
+  disputed: 'Contestado',
+  resolved: 'Resolvido',
+  cancelled: 'Cancelado',
+}
+
 function getBracketError(message: string) {
   const normalized = message.toLowerCase()
 
@@ -43,6 +53,10 @@ function getBracketError(message: string) {
 
   if (normalized.includes('permission') || normalized.includes('rls')) {
     return 'Permissão negada pelo banco.'
+  }
+
+  if (normalized.includes('seguro corrigir') || normalized.includes('proxima partida')) {
+    return 'Nao e seguro corrigir este resultado porque a chave ja avancou. Cancele ou resolva as partidas dependentes antes.'
   }
 
   return message
@@ -87,6 +101,13 @@ export async function fetchTournamentBracket(tournamentId: string) {
 
   if (matchesError) throw new Error(getBracketError(matchesError.message))
 
+  const { data: results, error: resultsError } = await supabase
+    .from('match_results')
+    .select('*')
+    .eq('bracket_id', bracket.id)
+
+  if (resultsError) throw new Error(getBracketError(resultsError.message))
+
   const { data: participants, error: participantsError } = await supabase
     .from('tournament_registrations')
     .select('*')
@@ -106,6 +127,10 @@ export async function fetchTournamentBracket(tournamentId: string) {
   return {
     bracket,
     matches,
+    resultsByMatchId: results.reduce<Record<string, MatchResult>>((map, result) => {
+      map[result.match_id] = result
+      return map
+    }, {}),
     participantsById,
   } satisfies TournamentBracketWithMatches
 }
@@ -217,13 +242,52 @@ export async function completeBracketMatch(params: {
   winnerRegistrationId: string
   scoreA: number
   scoreB: number
+  notes: string | null
+  changeReason: string | null
 }) {
-  const { error } = await supabase.rpc('complete_bracket_match', {
+  const { error } = await supabase.rpc('record_bracket_match_result', {
     target_match_id: params.matchId,
     target_winner_registration_id: params.winnerRegistrationId,
     target_score_a: params.scoreA,
     target_score_b: params.scoreB,
+    target_notes: params.notes,
+    target_change_reason: params.changeReason,
   })
 
   if (error) throw new Error(getBracketError(error.message))
+}
+
+export async function contestMatchResult(matchId: string, reason: string) {
+  const { error } = await supabase.rpc('contest_match_result', {
+    target_match_id: matchId,
+    target_reason: reason,
+  })
+
+  if (error) throw new Error(getBracketError(error.message))
+}
+
+export async function resolveMatchDispute(params: {
+  matchId: string
+  action: 'confirm' | 'cancel'
+  notes: string
+}) {
+  const { error } = await supabase.rpc('resolve_match_dispute', {
+    target_match_id: params.matchId,
+    target_resolution_action: params.action,
+    target_resolution_notes: params.notes,
+  })
+
+  if (error) throw new Error(getBracketError(error.message))
+}
+
+export async function fetchMatchResultHistory(matchId: string) {
+  const { data, error } = await supabase
+    .from('match_result_history')
+    .select('*')
+    .eq('match_id', matchId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(getBracketError(error.message))
+
+  return data satisfies MatchResultHistory[]
 }

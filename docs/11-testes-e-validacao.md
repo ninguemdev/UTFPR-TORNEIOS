@@ -283,3 +283,20 @@ Permissões:
 - Organizador autorizado consegue agir apenas em torneio que administra.
 - Usuário comum e visitante só visualizam chave pública.
 - Chamada direta para alterar vencedor/placar em `bracket_matches` sem RPC deve falhar pelo trigger `protect_bracket_match_update`.
+
+## Atualizacao: testes manuais de resultados
+
+O projeto ainda nao possui runner de testes unitarios. A validacao de resultado foi isolada em `src/lib/tournaments/matchResults.ts`.
+
+Casos obrigatorios:
+
+- Placar valido: partida `ready` com dois participantes, placar 2 x 1, vencedor avanca.
+- Placar negativo: front e RPC recusam.
+- Empate em mata-mata: front e RPC recusam.
+- Partida sem participantes: resultado bloqueado.
+- Partida com bye: resultado manual bloqueado.
+- Usuario comum tentando alterar resultado: chamada direta deve falhar por RLS/RPC.
+- Admin alterando resultado: permitido com justificativa quando finalizado.
+- Contestacao: participante muda partida para `disputed`.
+- Historico: cada registro, correcao, contestacao e resolucao cria linha em `match_result_history`.
+- Vencedor avancando: `next_match_id` recebe vencedor no slot correto.

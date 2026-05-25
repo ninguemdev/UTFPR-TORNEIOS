@@ -5,15 +5,25 @@ import { useAuth } from '../../context/auth'
 import type {
   BracketMatch,
   BracketSeedingMethod,
+  MatchResult,
+  MatchResultHistory,
   TournamentRegistration,
 } from '../../lib/supabase/types'
+import {
+  validateContestReason,
+  validateMatchResult,
+} from '../../lib/tournaments/matchResults'
 import {
   bracketMatchStatusLabels,
   bracketSeedingMethodLabels,
   completeBracketMatch,
+  contestMatchResult,
   fetchBracketParticipants,
+  fetchMatchResultHistory,
   fetchTournamentBracket,
   generateTournamentBracket,
+  matchResultStatusLabels,
+  resolveMatchDispute,
   type TournamentBracketWithMatches,
 } from '../../services/brackets'
 import {
@@ -22,7 +32,16 @@ import {
   type TournamentWithCount,
 } from '../../services/tournaments'
 
-type ScoresByMatch = Record<string, { scoreA: string; scoreB: string }>
+type ResultForm = {
+  scoreA: string
+  scoreB: string
+  notes: string
+  changeReason: string
+  contestReason: string
+  resolutionNotes: string
+}
+
+type ResultFormByMatch = Record<string, ResultForm>
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -48,13 +67,40 @@ function getParticipantName(
   return participantsById[participantId]?.display_name ?? 'Participante removido'
 }
 
+function getEmptyResultForm(): ResultForm {
+  return {
+    scoreA: '',
+    scoreB: '',
+    notes: '',
+    changeReason: '',
+    contestReason: '',
+    resolutionNotes: '',
+  }
+}
+
+function isUserParticipantInMatch(
+  match: BracketMatch,
+  participantsById: Record<string, TournamentRegistration>,
+  userId: string | undefined,
+) {
+  if (!userId) return false
+
+  return [match.participant_a_registration_id, match.participant_b_registration_id]
+    .filter(Boolean)
+    .some((participantId) => {
+      const participant = participantsById[participantId!]
+      return participant?.user_id === userId || participant?.captain_user_id === userId
+    })
+}
+
 export function TournamentBracketPage({ tournamentId }: { tournamentId: string }) {
   const { user, isAdmin, canCreateTournaments } = useAuth()
   const [tournament, setTournament] = useState<TournamentWithCount | null>(null)
   const [bracketData, setBracketData] = useState<TournamentBracketWithMatches | null>(null)
   const [eligibleCount, setEligibleCount] = useState(0)
   const [seedingMethod, setSeedingMethod] = useState<BracketSeedingMethod>('draw')
-  const [scoresByMatch, setScoresByMatch] = useState<ScoresByMatch>({})
+  const [resultFormsByMatch, setResultFormsByMatch] = useState<ResultFormByMatch>({})
+  const [historyByMatch, setHistoryByMatch] = useState<Record<string, MatchResultHistory[]>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState('')
   const [error, setError] = useState('')
@@ -74,6 +120,11 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
       {},
     )
   }, [bracketData])
+
+  const disputedMatches = useMemo(
+    () => (bracketData?.matches ?? []).filter((match) => match.status === 'disputed'),
+    [bracketData],
+  )
 
   const loadBracket = useCallback(async () => {
     setIsLoading(true)
@@ -95,7 +146,7 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
       setError(
         loadError instanceof Error
           ? loadError.message
-          : 'Não foi possível carregar a chave.',
+          : 'Nao foi possivel carregar a chave.',
       )
     } finally {
       setIsLoading(false)
@@ -110,6 +161,16 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
     return () => window.clearTimeout(timer)
   }, [loadBracket])
 
+  function updateMatchForm(matchId: string, field: keyof ResultForm, value: string) {
+    setResultFormsByMatch((current) => ({
+      ...current,
+      [matchId]: {
+        ...(current[matchId] ?? getEmptyResultForm()),
+        [field]: value,
+      },
+    }))
+  }
+
   async function handleGenerateBracket(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!tournament || !user) return
@@ -119,7 +180,7 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
     if (
       forceRegenerate &&
       !window.confirm(
-        'Regerar a chave remove a estrutura atual e altera avanços/resultados já lançados. Deseja continuar?',
+        'Regerar a chave remove a estrutura atual e altera avancos/resultados ja lancados. Deseja continuar?',
       )
     ) {
       return
@@ -143,7 +204,7 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
       setError(
         generateError instanceof Error
           ? generateError.message
-          : 'Não foi possível gerar a chave.',
+          : 'Nao foi possivel gerar a chave.',
       )
     } finally {
       setIsSubmitting('')
@@ -151,27 +212,23 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
   }
 
   async function handleCompleteMatch(match: BracketMatch) {
-    const scores = scoresByMatch[match.id] ?? { scoreA: '', scoreB: '' }
-    const scoreA = Number(scores.scoreA)
-    const scoreB = Number(scores.scoreB)
+    const form = resultFormsByMatch[match.id] ?? getEmptyResultForm()
+    const scoreA = form.scoreA.trim() === '' ? null : Number(form.scoreA)
+    const scoreB = form.scoreB.trim() === '' ? null : Number(form.scoreB)
+    const validation = validateMatchResult({
+      format: tournament?.format ?? 'single_elimination',
+      status: match.status,
+      isBye: match.is_bye,
+      participantAId: match.participant_a_registration_id,
+      participantBId: match.participant_b_registration_id,
+      scoreA,
+      scoreB,
+      isCorrection: ['completed', 'disputed'].includes(match.status),
+      changeReason: form.changeReason,
+    })
 
-    if (!Number.isInteger(scoreA) || !Number.isInteger(scoreB) || scoreA < 0 || scoreB < 0) {
-      setError('Informe placares inteiros e não negativos.')
-      return
-    }
-
-    if (scoreA === scoreB) {
-      setError('Mata-mata simples não permite empate.')
-      return
-    }
-
-    const winnerRegistrationId =
-      scoreA > scoreB
-        ? match.participant_a_registration_id
-        : match.participant_b_registration_id
-
-    if (!winnerRegistrationId) {
-      setError('A partida ainda não possui participante vencedor válido.')
+    if (!validation.valid || scoreA === null || scoreB === null || !validation.winnerRegistrationId) {
+      setError(validation.errors[0] ?? 'Resultado invalido.')
       return
     }
 
@@ -182,17 +239,108 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
     try {
       await completeBracketMatch({
         matchId: match.id,
-        winnerRegistrationId,
+        winnerRegistrationId: validation.winnerRegistrationId,
         scoreA,
         scoreB,
+        notes: form.notes.trim() || null,
+        changeReason: form.changeReason.trim() || null,
       })
       await loadBracket()
-      setSuccess('Resultado confirmado e vencedor avançado.')
+      setSuccess('Resultado confirmado e vencedor avancado.')
     } catch (completeError) {
       setError(
         completeError instanceof Error
           ? completeError.message
-          : 'Não foi possível confirmar o resultado.',
+          : 'Nao foi possivel confirmar o resultado.',
+      )
+    } finally {
+      setIsSubmitting('')
+    }
+  }
+
+  async function handleContestMatch(match: BracketMatch) {
+    const form = resultFormsByMatch[match.id] ?? getEmptyResultForm()
+    const reasonError = validateContestReason(form.contestReason)
+
+    if (reasonError) {
+      setError(reasonError)
+      return
+    }
+
+    setIsSubmitting(`${match.id}:contest`)
+    setError('')
+    setSuccess('')
+
+    try {
+      await contestMatchResult(match.id, form.contestReason.trim())
+      await loadBracket()
+      setSuccess('Resultado contestado. A organizacao precisa resolver a pendencia.')
+    } catch (contestError) {
+      setError(
+        contestError instanceof Error
+          ? contestError.message
+          : 'Nao foi possivel contestar o resultado.',
+      )
+    } finally {
+      setIsSubmitting('')
+    }
+  }
+
+  async function handleResolveDispute(match: BracketMatch, action: 'confirm' | 'cancel') {
+    const form = resultFormsByMatch[match.id] ?? getEmptyResultForm()
+
+    if (form.resolutionNotes.trim().length < 3) {
+      setError('Informe uma observacao para resolver a contestacao.')
+      return
+    }
+
+    setIsSubmitting(`${match.id}:resolve:${action}`)
+    setError('')
+    setSuccess('')
+
+    try {
+      await resolveMatchDispute({
+        matchId: match.id,
+        action,
+        notes: form.resolutionNotes.trim(),
+      })
+      await loadBracket()
+      setSuccess(action === 'confirm' ? 'Contestacao resolvida.' : 'Resultado cancelado para novo lancamento.')
+    } catch (resolveError) {
+      setError(
+        resolveError instanceof Error
+          ? resolveError.message
+          : 'Nao foi possivel resolver a contestacao.',
+      )
+    } finally {
+      setIsSubmitting('')
+    }
+  }
+
+  async function handleLoadHistory(matchId: string) {
+    if (historyByMatch[matchId]) {
+      setHistoryByMatch((current) => {
+        const next = { ...current }
+        delete next[matchId]
+        return next
+      })
+      return
+    }
+
+    setIsSubmitting(`${matchId}:history`)
+    setError('')
+
+    try {
+      const history = await fetchMatchResultHistory(matchId)
+      setHistoryByMatch((current) => ({
+        ...current,
+        [matchId]: history,
+      }))
+    } catch (historyError) {
+      setError(
+        historyError instanceof Error
+          ? historyError.message
+          : 'Nao foi possivel carregar o historico.',
       )
     } finally {
       setIsSubmitting('')
@@ -215,8 +363,8 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
       <AuthenticatedShell subtitle="Chave">
         <section className="empty-state">
           <span className="empty-state-mark" aria-hidden="true">?</span>
-          <h1>Torneio não encontrado</h1>
-          <p>{error || 'O torneio não existe ou você não tem permissão para ver esta chave.'}</p>
+          <h1>Torneio nao encontrado</h1>
+          <p>{error || 'O torneio nao existe ou voce nao tem permissao para ver esta chave.'}</p>
           <a className="button button-primary" href="#/torneios">
             Ver torneios
           </a>
@@ -233,8 +381,8 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
             <span className="eyebrow">Mata-mata simples</span>
             <h1 id="bracket-title">Chave</h1>
             <p>
-              Gere e acompanhe rodadas, byes, status de partidas e avanço de
-              vencedores para {tournament.name}.
+              Gere e acompanhe rodadas, byes, status de partidas, resultados,
+              contestacoes e historico para {tournament.name}.
             </p>
           </div>
           <div className="page-header-action">
@@ -255,17 +403,17 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
 
         <section className="surface-panel">
           <div className="section-heading">
-            <h2>Configuração</h2>
+            <h2>Configuracao</h2>
             <p>
-              {eligibleCount} participante(s) confirmado(s) entram na geração.
-              O sorteio é salvo no banco apenas no momento da geração.
+              {eligibleCount} participante(s) confirmado(s) entram na geracao.
+              O sorteio e salvo no banco apenas no momento da geracao.
             </p>
           </div>
 
           {canManage ? (
             <form className="toolbar" onSubmit={handleGenerateBracket}>
               <label className="field" htmlFor="bracket-seeding-method">
-                <span>Método</span>
+                <span>Metodo</span>
                 <select
                   id="bracket-seeding-method"
                   value={seedingMethod}
@@ -273,7 +421,7 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
                     setSeedingMethod(event.target.value as BracketSeedingMethod)
                   }
                 >
-                  <option value="draw">Sorteio aleatório</option>
+                  <option value="draw">Sorteio aleatorio</option>
                   <option value="seeded">Seeding</option>
                 </select>
               </label>
@@ -297,9 +445,9 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
         {!bracketData ? (
           <section className="empty-state">
             <span className="empty-state-mark" aria-hidden="true">0</span>
-            <h2>Chave ainda não gerada</h2>
+            <h2>Chave ainda nao gerada</h2>
             <p>
-              A chave aparecerá aqui depois que a organização escolher sorteio
+              A chave aparecera aqui depois que a organizacao escolher sorteio
               ou seeding e gerar a estrutura.
             </p>
           </section>
@@ -309,21 +457,37 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
               <div className="section-heading">
                 <h2>Resumo da chave</h2>
                 <p>
-                  Método: {bracketSeedingMethodLabels[bracketData.bracket.seeding_method]}.
+                  Metodo: {bracketSeedingMethodLabels[bracketData.bracket.seeding_method]}.
                   Tamanho: {bracketData.bracket.size}. Rodadas: {bracketData.bracket.rounds_count}.
                   Gerada em {formatDateTime(bracketData.bracket.generated_at)}.
                 </p>
               </div>
               {bracketData.bracket.winner_registration_id && (
                 <div className="form-message form-message-success" role="status">
-                  Campeão: {getParticipantName(
+                  Campeao: {getParticipantName(
                     bracketData.bracket.winner_registration_id,
                     bracketData.participantsById,
-                    'Campeão definido',
+                    'Campeao definido',
                   )}
                 </div>
               )}
             </section>
+
+            {canManage && disputedMatches.length > 0 && (
+              <section className="surface-panel">
+                <div className="section-heading">
+                  <h2>Resultados contestados</h2>
+                  <p>{disputedMatches.length} partida(s) exigem resolucao administrativa.</p>
+                </div>
+                <ul className="compact-list">
+                  {disputedMatches.map((match) => (
+                    <li key={match.id}>
+                      Rodada {match.round_number}, partida {match.match_number}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             <section className="bracket" aria-label="Chave mata-mata">
               {Object.entries(matchesByRound).map(([roundNumber, matches]) => (
@@ -340,21 +504,25 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
                       <BracketMatchCard
                         key={match.id}
                         match={match}
+                        result={bracketData.resultsByMatchId[match.id]}
+                        history={historyByMatch[match.id] ?? null}
                         participantsById={bracketData.participantsById}
                         canManage={canManage}
+                        canContest={isUserParticipantInMatch(
+                          match,
+                          bracketData.participantsById,
+                          user?.id,
+                        )}
                         isSubmitting={isSubmitting === match.id}
-                        scores={scoresByMatch[match.id] ?? { scoreA: '', scoreB: '' }}
-                        onScoreChange={(slot, value) =>
-                          setScoresByMatch((current) => ({
-                            ...current,
-                            [match.id]: {
-                              scoreA: current[match.id]?.scoreA ?? '',
-                              scoreB: current[match.id]?.scoreB ?? '',
-                              [slot]: value,
-                            },
-                          }))
-                        }
+                        isContestSubmitting={isSubmitting === `${match.id}:contest`}
+                        isHistoryLoading={isSubmitting === `${match.id}:history`}
+                        isResolving={isSubmitting.startsWith(`${match.id}:resolve`)}
+                        form={resultFormsByMatch[match.id] ?? getEmptyResultForm()}
+                        onFormChange={(field, value) => updateMatchForm(match.id, field, value)}
                         onComplete={() => void handleCompleteMatch(match)}
+                        onContest={() => void handleContestMatch(match)}
+                        onResolve={(action) => void handleResolveDispute(match, action)}
+                        onToggleHistory={() => void handleLoadHistory(match.id)}
                       />
                     ))}
                   </div>
@@ -370,20 +538,38 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
 
 function BracketMatchCard({
   match,
+  result,
+  history,
   participantsById,
   canManage,
+  canContest,
   isSubmitting,
-  scores,
-  onScoreChange,
+  isContestSubmitting,
+  isHistoryLoading,
+  isResolving,
+  form,
+  onFormChange,
   onComplete,
+  onContest,
+  onResolve,
+  onToggleHistory,
 }: {
   match: BracketMatch
+  result: MatchResult | undefined
+  history: MatchResultHistory[] | null
   participantsById: Record<string, TournamentRegistration>
   canManage: boolean
+  canContest: boolean
   isSubmitting: boolean
-  scores: { scoreA: string; scoreB: string }
-  onScoreChange: (slot: 'scoreA' | 'scoreB', value: string) => void
+  isContestSubmitting: boolean
+  isHistoryLoading: boolean
+  isResolving: boolean
+  form: ResultForm
+  onFormChange: (field: keyof ResultForm, value: string) => void
   onComplete: () => void
+  onContest: () => void
+  onResolve: (action: 'confirm' | 'cancel') => void
+  onToggleHistory: () => void
 }) {
   const participantAName = getParticipantName(
     match.participant_a_registration_id,
@@ -397,8 +583,11 @@ function BracketMatchCard({
   )
   const canComplete =
     canManage &&
-    ['ready', 'live'].includes(match.status) &&
+    ['ready', 'live', 'completed', 'disputed'].includes(match.status) &&
     Boolean(match.participant_a_registration_id && match.participant_b_registration_id)
+  const isCorrection = ['completed', 'disputed'].includes(match.status)
+  const showContest = canContest && !canManage && match.status === 'completed' && Boolean(result)
+  const showHistoryAction = canManage || canContest
 
   return (
     <article className="bracket-match">
@@ -422,7 +611,24 @@ function BracketMatchCard({
         />
       </div>
       {match.is_bye && (
-        <p className="subtle-note">Bye registrado. O participante avançou automaticamente.</p>
+        <p className="subtle-note">Bye registrado. O participante avancou automaticamente.</p>
+      )}
+      {result && (
+        <div className="result-summary">
+          <span className={`badge badge-result-${result.status}`}>
+            {matchResultStatusLabels[result.status]}
+          </span>
+          <p>
+            Resultado registrado em {formatDateTime(result.submitted_at)}
+            {result.notes ? `: ${result.notes}` : '.'}
+          </p>
+          {result.status === 'disputed' && result.dispute_reason && (
+            <p>Contestacao: {result.dispute_reason}</p>
+          )}
+          {result.resolution_notes && (
+            <p>Resolucao: {result.resolution_notes}</p>
+          )}
+        </div>
       )}
       {canComplete && (
         <form
@@ -438,8 +644,8 @@ function BracketMatchCard({
               id={`score-a-${match.id}`}
               type="number"
               min="0"
-              value={scores.scoreA}
-              onChange={(event) => onScoreChange('scoreA', event.target.value)}
+              value={form.scoreA}
+              onChange={(event) => onFormChange('scoreA', event.target.value)}
             />
           </label>
           <label className="field" htmlFor={`score-b-${match.id}`}>
@@ -448,14 +654,110 @@ function BracketMatchCard({
               id={`score-b-${match.id}`}
               type="number"
               min="0"
-              value={scores.scoreB}
-              onChange={(event) => onScoreChange('scoreB', event.target.value)}
+              value={form.scoreB}
+              onChange={(event) => onFormChange('scoreB', event.target.value)}
             />
           </label>
+          <label className="field" htmlFor={`result-notes-${match.id}`}>
+            <span>Observacoes</span>
+            <textarea
+              id={`result-notes-${match.id}`}
+              rows={2}
+              value={form.notes}
+              onChange={(event) => onFormChange('notes', event.target.value)}
+            />
+          </label>
+          {isCorrection && (
+            <label className="field" htmlFor={`change-reason-${match.id}`}>
+              <span>Justificativa da correcao</span>
+              <textarea
+                id={`change-reason-${match.id}`}
+                rows={2}
+                value={form.changeReason}
+                onChange={(event) => onFormChange('changeReason', event.target.value)}
+                required
+              />
+            </label>
+          )}
           <button className="button button-secondary" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Confirmando...' : 'Confirmar vencedor'}
+            {isSubmitting ? 'Confirmando...' : isCorrection ? 'Corrigir resultado' : 'Confirmar vencedor'}
           </button>
         </form>
+      )}
+      {showContest && (
+        <form
+          className="contest-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            onContest()
+          }}
+        >
+          <label className="field" htmlFor={`contest-reason-${match.id}`}>
+            <span>Motivo da contestacao</span>
+            <textarea
+              id={`contest-reason-${match.id}`}
+              rows={2}
+              value={form.contestReason}
+              onChange={(event) => onFormChange('contestReason', event.target.value)}
+              required
+            />
+          </label>
+          <button className="button button-ghost" type="submit" disabled={isContestSubmitting}>
+            {isContestSubmitting ? 'Contestando...' : 'Contestar resultado'}
+          </button>
+        </form>
+      )}
+      {canManage && match.status === 'disputed' && (
+        <div className="contest-form">
+          <label className="field" htmlFor={`resolution-notes-${match.id}`}>
+            <span>Observacao da resolucao</span>
+            <textarea
+              id={`resolution-notes-${match.id}`}
+              rows={2}
+              value={form.resolutionNotes}
+              onChange={(event) => onFormChange('resolutionNotes', event.target.value)}
+            />
+          </label>
+          <div className="button-row">
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={isResolving}
+              onClick={() => onResolve('confirm')}
+            >
+              {isResolving ? 'Resolvendo...' : 'Manter resultado'}
+            </button>
+            <button
+              className="button button-ghost"
+              type="button"
+              disabled={isResolving}
+              onClick={() => onResolve('cancel')}
+            >
+              Cancelar resultado
+            </button>
+          </div>
+        </div>
+      )}
+      {showHistoryAction && (
+        <div className="history-panel">
+          <button className="button button-ghost" type="button" onClick={onToggleHistory}>
+            {isHistoryLoading ? 'Carregando...' : history ? 'Ocultar historico' : 'Ver historico'}
+          </button>
+          {history && (
+            history.length === 0 ? (
+              <p className="subtle-note">Nenhuma alteracao registrada.</p>
+            ) : (
+              <ol className="compact-list">
+                {history.map((entry) => (
+                  <li key={entry.id}>
+                    {formatDateTime(entry.created_at)} - {entry.previous_status ?? 'novo'} para {entry.new_status ?? 'sem status'}
+                    {entry.change_reason ? ` - ${entry.change_reason}` : ''}
+                  </li>
+                ))}
+              </ol>
+            )
+          )}
+        </div>
       )}
     </article>
   )

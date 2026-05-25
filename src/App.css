@@ -453,6 +453,22 @@ dd {
   background: var(--color-surface-muted);
 }
 
+.badge-result-confirmed,
+.badge-result-resolved {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+}
+
+.badge-result-disputed {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.badge-result-cancelled {
+  color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+}
+
 .badge-request-pending {
   color: var(--color-info);
   background: var(--color-info-soft);
@@ -1327,6 +1343,23 @@ tbody tr:hover {
 
 .compact-score-form .button {
   min-height: 3rem;
+}
+
+.result-summary,
+.contest-form,
+.history-panel {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+}
+
+.result-summary p,
+.history-panel li {
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
 }
 
 @keyframes spin {

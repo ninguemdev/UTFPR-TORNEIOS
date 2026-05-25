@@ -2948,3 +2948,854 @@ create policy "bracket_matches_delete_manager"
   for delete
   to authenticated
   using (public.can_manage_tournament(tournament_id));
+
+-- ---------------------------------------------------------------------------
+-- Resultados, contestacoes e historico da chave
+-- ---------------------------------------------------------------------------
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_type
+    where typname = 'match_result_status'
+      and typnamespace = 'public'::regnamespace
+  ) then
+    create type public.match_result_status as enum (
+      'confirmed',
+      'disputed',
+      'resolved',
+      'cancelled'
+    );
+  end if;
+end
+$$;
+
+alter table public.bracket_matches
+  add column if not exists result_notes text;
+
+alter table public.bracket_matches
+  add column if not exists submitted_by uuid references public.profiles(id) on delete set null;
+
+alter table public.bracket_matches
+  add column if not exists submitted_at timestamptz;
+
+alter table public.bracket_matches
+  add column if not exists confirmed_by uuid references public.profiles(id) on delete set null;
+
+alter table public.bracket_matches
+  add column if not exists confirmed_at timestamptz;
+
+comment on column public.bracket_matches.result_notes is
+  'Observacoes administrativas do resultado confirmado ou corrigido.';
+comment on column public.bracket_matches.submitted_by is
+  'Usuario que registrou o resultado pela RPC protegida.';
+comment on column public.bracket_matches.confirmed_by is
+  'Admin ou organizador que confirmou o resultado.';
+
+create table if not exists public.match_results (
+  id uuid primary key default extensions.gen_random_uuid(),
+  match_id uuid not null unique references public.bracket_matches(id) on delete cascade,
+  bracket_id uuid not null references public.tournament_brackets(id) on delete cascade,
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  score_a integer not null,
+  score_b integer not null,
+  winner_registration_id uuid not null references public.tournament_registrations(id) on delete restrict,
+  status public.match_result_status not null default 'confirmed',
+  notes text,
+  submitted_by uuid references public.profiles(id) on delete set null,
+  submitted_at timestamptz not null default now(),
+  confirmed_by uuid references public.profiles(id) on delete set null,
+  confirmed_at timestamptz,
+  disputed_by uuid references public.profiles(id) on delete set null,
+  disputed_at timestamptz,
+  dispute_reason text,
+  resolved_by uuid references public.profiles(id) on delete set null,
+  resolved_at timestamptz,
+  resolution_notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint match_results_scores_non_negative check (score_a >= 0 and score_b >= 0),
+  constraint match_results_dispute_consistency check (
+    (
+      status = 'disputed'::public.match_result_status
+      and disputed_by is not null
+      and disputed_at is not null
+      and length(btrim(coalesce(dispute_reason, ''))) > 0
+    )
+    or status <> 'disputed'::public.match_result_status
+  ),
+  constraint match_results_resolution_consistency check (
+    (
+      status in (
+        'resolved'::public.match_result_status,
+        'cancelled'::public.match_result_status
+      )
+      and resolved_by is not null
+      and resolved_at is not null
+    )
+    or status not in (
+      'resolved'::public.match_result_status,
+      'cancelled'::public.match_result_status
+    )
+  )
+);
+
+comment on table public.match_results is
+  'Resultado confirmado, contestado ou resolvido de uma partida da chave.';
+comment on column public.match_results.status is
+  'confirmed e o fluxo direto do MVP; disputed indica contestacao; resolved/cancelled encerram a contestacao.';
+
+create index if not exists match_results_tournament_status_idx
+  on public.match_results (tournament_id, status);
+
+create table if not exists public.match_result_history (
+  id uuid primary key default extensions.gen_random_uuid(),
+  match_id uuid not null references public.bracket_matches(id) on delete cascade,
+  result_id uuid references public.match_results(id) on delete set null,
+  previous_score_a integer,
+  previous_score_b integer,
+  new_score_a integer,
+  new_score_b integer,
+  previous_winner_registration_id uuid references public.tournament_registrations(id) on delete set null,
+  new_winner_registration_id uuid references public.tournament_registrations(id) on delete set null,
+  previous_status public.bracket_match_status,
+  new_status public.bracket_match_status,
+  changed_by uuid references public.profiles(id) on delete set null,
+  change_reason text,
+  created_at timestamptz not null default now()
+);
+
+comment on table public.match_result_history is
+  'Historico imutavel de registros, correcoes, contestacoes e resolucoes de resultado.';
+
+create index if not exists match_result_history_match_idx
+  on public.match_result_history (match_id, created_at desc);
+
+create or replace function public.is_match_participant(target_match_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.bracket_matches bracket_match
+    join public.tournament_registrations registration
+      on registration.id in (
+        bracket_match.participant_a_registration_id,
+        bracket_match.participant_b_registration_id
+      )
+    where bracket_match.id = target_match_id
+      and (
+        registration.user_id = auth.uid()
+        or registration.captain_user_id = auth.uid()
+        or exists (
+          select 1
+          from public.team_members member
+          where member.team_id = registration.team_id
+            and member.user_id = auth.uid()
+            and member.status = 'active'::public.team_member_status
+        )
+      )
+  );
+$$;
+
+comment on function public.is_match_participant(uuid) is
+  'Retorna true quando auth.uid() participa da partida como inscrito individual, capitao ou membro ativo da equipe.';
+
+revoke all on function public.is_match_participant(uuid) from public;
+grant execute on function public.is_match_participant(uuid) to authenticated;
+
+create or replace function public.protect_bracket_match_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if current_setting('app.bracket_completion', true) = 'on'
+    or current_setting('app.match_result_write', true) = 'on'
+  then
+    return new;
+  end if;
+
+  if new.participant_a_registration_id is distinct from old.participant_a_registration_id
+    or new.participant_b_registration_id is distinct from old.participant_b_registration_id
+    or new.winner_registration_id is distinct from old.winner_registration_id
+    or new.score_a is distinct from old.score_a
+    or new.score_b is distinct from old.score_b
+    or new.status is distinct from old.status
+    or new.is_bye is distinct from old.is_bye
+    or new.result_notes is distinct from old.result_notes
+    or new.submitted_by is distinct from old.submitted_by
+    or new.submitted_at is distinct from old.submitted_at
+    or new.confirmed_by is distinct from old.confirmed_by
+    or new.confirmed_at is distinct from old.confirmed_at
+  then
+    raise exception 'Alteracoes de resultado e avanco da chave devem usar RPC protegida.';
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace function public.record_bracket_match_result(
+  target_match_id uuid,
+  target_winner_registration_id uuid,
+  target_score_a integer,
+  target_score_b integer,
+  target_notes text default null,
+  target_change_reason text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_match public.bracket_matches%rowtype;
+  target_result public.match_results%rowtype;
+  next_match public.bracket_matches%rowtype;
+  is_correction boolean;
+  stored_result_id uuid;
+begin
+  select *
+  into target_match
+  from public.bracket_matches
+  where id = target_match_id;
+
+  if target_match.id is null then
+    raise exception 'Partida da chave nao encontrada.';
+  end if;
+
+  if not public.can_manage_tournament(target_match.tournament_id) then
+    raise exception 'Usuario nao pode registrar resultado desta chave.';
+  end if;
+
+  if target_match.is_bye or target_match.status = 'bye'::public.bracket_match_status then
+    raise exception 'Partida com bye nao recebe resultado manual.';
+  end if;
+
+  if target_match.participant_a_registration_id is null
+    or target_match.participant_b_registration_id is null
+  then
+    raise exception 'Partida ainda nao possui dois participantes.';
+  end if;
+
+  select *
+  into target_result
+  from public.match_results
+  where match_id = target_match.id;
+
+  is_correction := target_match.status in (
+    'completed'::public.bracket_match_status,
+    'disputed'::public.bracket_match_status
+  )
+    or target_result.id is not null;
+
+  if not is_correction
+    and target_match.status not in (
+      'ready'::public.bracket_match_status,
+      'live'::public.bracket_match_status
+    )
+  then
+    raise exception 'Somente partidas prontas ou ao vivo podem receber resultado.';
+  end if;
+
+  if is_correction
+    and length(btrim(coalesce(target_change_reason, ''))) < 3
+  then
+    raise exception 'Correcoes de resultado finalizado exigem justificativa.';
+  end if;
+
+  if target_winner_registration_id not in (
+    target_match.participant_a_registration_id,
+    target_match.participant_b_registration_id
+  ) then
+    raise exception 'Vencedor nao pertence a esta partida.';
+  end if;
+
+  if target_score_a is null
+    or target_score_b is null
+    or target_score_a < 0
+    or target_score_b < 0
+    or target_score_a = target_score_b
+  then
+    raise exception 'Placar invalido para mata-mata simples.';
+  end if;
+
+  if target_winner_registration_id = target_match.participant_a_registration_id
+    and target_score_a <= target_score_b
+  then
+    raise exception 'Placar nao confirma o vencedor informado.';
+  end if;
+
+  if target_winner_registration_id = target_match.participant_b_registration_id
+    and target_score_b <= target_score_a
+  then
+    raise exception 'Placar nao confirma o vencedor informado.';
+  end if;
+
+  if is_correction
+    and target_match.winner_registration_id is not null
+    and target_match.winner_registration_id is distinct from target_winner_registration_id
+    and target_match.next_match_id is not null
+  then
+    select *
+    into next_match
+    from public.bracket_matches
+    where id = target_match.next_match_id;
+
+    if next_match.status in (
+      'completed'::public.bracket_match_status,
+      'live'::public.bracket_match_status,
+      'disputed'::public.bracket_match_status
+    )
+      or next_match.winner_registration_id is not null
+    then
+      raise exception 'Nao e seguro corrigir vencedor porque a proxima partida ja possui resultado ou esta em andamento.';
+    end if;
+  end if;
+
+  perform set_config('app.match_result_write', 'on', true);
+  perform set_config('app.bracket_completion', 'on', true);
+
+  insert into public.match_result_history (
+    match_id,
+    result_id,
+    previous_score_a,
+    previous_score_b,
+    new_score_a,
+    new_score_b,
+    previous_winner_registration_id,
+    new_winner_registration_id,
+    previous_status,
+    new_status,
+    changed_by,
+    change_reason
+  )
+  values (
+    target_match.id,
+    target_result.id,
+    target_match.score_a,
+    target_match.score_b,
+    target_score_a,
+    target_score_b,
+    target_match.winner_registration_id,
+    target_winner_registration_id,
+    target_match.status,
+    'completed'::public.bracket_match_status,
+    auth.uid(),
+    coalesce(nullif(target_change_reason, ''), nullif(target_notes, ''), 'Resultado registrado')
+  );
+
+  insert into public.match_results (
+    match_id,
+    bracket_id,
+    tournament_id,
+    score_a,
+    score_b,
+    winner_registration_id,
+    status,
+    notes,
+    submitted_by,
+    submitted_at,
+    confirmed_by,
+    confirmed_at,
+    disputed_by,
+    disputed_at,
+    dispute_reason,
+    resolved_by,
+    resolved_at,
+    resolution_notes
+  )
+  values (
+    target_match.id,
+    target_match.bracket_id,
+    target_match.tournament_id,
+    target_score_a,
+    target_score_b,
+    target_winner_registration_id,
+    'confirmed'::public.match_result_status,
+    nullif(target_notes, ''),
+    auth.uid(),
+    now(),
+    auth.uid(),
+    now(),
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  )
+  on conflict (match_id) do update
+    set score_a = excluded.score_a,
+        score_b = excluded.score_b,
+        winner_registration_id = excluded.winner_registration_id,
+        status = excluded.status,
+        notes = excluded.notes,
+        submitted_by = excluded.submitted_by,
+        submitted_at = excluded.submitted_at,
+        confirmed_by = excluded.confirmed_by,
+        confirmed_at = excluded.confirmed_at,
+        disputed_by = null,
+        disputed_at = null,
+        dispute_reason = null,
+        resolved_by = null,
+        resolved_at = null,
+        resolution_notes = null,
+        updated_at = now()
+  returning id into stored_result_id;
+
+  update public.match_result_history
+  set result_id = stored_result_id
+  where match_id = target_match.id
+    and result_id is null
+    and changed_by is not distinct from auth.uid()
+    and created_at = (
+      select max(created_at)
+      from public.match_result_history
+      where match_id = target_match.id
+    );
+
+  update public.bracket_matches
+  set status = 'completed'::public.bracket_match_status,
+      score_a = target_score_a,
+      score_b = target_score_b,
+      winner_registration_id = target_winner_registration_id,
+      result_notes = nullif(target_notes, ''),
+      submitted_by = auth.uid(),
+      submitted_at = now(),
+      confirmed_by = auth.uid(),
+      confirmed_at = now(),
+      updated_at = now()
+  where id = target_match.id;
+
+  if target_match.next_match_id is null then
+    update public.tournament_brackets
+    set winner_registration_id = target_winner_registration_id,
+        updated_at = now()
+    where id = target_match.bracket_id;
+  elsif target_match.next_match_slot = 'a' then
+    update public.bracket_matches
+    set participant_a_registration_id = target_winner_registration_id,
+        status = case
+          when participant_b_registration_id is not null then 'ready'::public.bracket_match_status
+          else status
+        end,
+        updated_at = now()
+    where id = target_match.next_match_id;
+  elsif target_match.next_match_slot = 'b' then
+    update public.bracket_matches
+    set participant_b_registration_id = target_winner_registration_id,
+        status = case
+          when participant_a_registration_id is not null then 'ready'::public.bracket_match_status
+          else status
+        end,
+        updated_at = now()
+    where id = target_match.next_match_id;
+  else
+    raise exception 'Destino do vencedor invalido.';
+  end if;
+
+  perform set_config('app.bracket_completion', 'off', true);
+  perform set_config('app.match_result_write', 'off', true);
+end;
+$$;
+
+comment on function public.record_bracket_match_result(uuid, uuid, integer, integer, text, text) is
+  'Registra ou corrige resultado com auditoria, valida placar de mata-mata e avanca vencedor de forma transacional.';
+
+revoke all on function public.record_bracket_match_result(uuid, uuid, integer, integer, text, text) from public;
+grant execute on function public.record_bracket_match_result(uuid, uuid, integer, integer, text, text) to authenticated;
+
+create or replace function public.complete_bracket_match(
+  target_match_id uuid,
+  target_winner_registration_id uuid,
+  target_score_a integer,
+  target_score_b integer
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.record_bracket_match_result(
+    target_match_id,
+    target_winner_registration_id,
+    target_score_a,
+    target_score_b,
+    null,
+    null
+  );
+end;
+$$;
+
+comment on function public.complete_bracket_match(uuid, uuid, integer, integer) is
+  'Compatibilidade: registra resultado simples chamando record_bracket_match_result.';
+
+revoke all on function public.complete_bracket_match(uuid, uuid, integer, integer) from public;
+grant execute on function public.complete_bracket_match(uuid, uuid, integer, integer) to authenticated;
+
+create or replace function public.contest_match_result(
+  target_match_id uuid,
+  target_reason text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_match public.bracket_matches%rowtype;
+  target_result public.match_results%rowtype;
+begin
+  select *
+  into target_match
+  from public.bracket_matches
+  where id = target_match_id;
+
+  if target_match.id is null then
+    raise exception 'Partida da chave nao encontrada.';
+  end if;
+
+  if not public.is_match_participant(target_match.id) then
+    raise exception 'Somente participante da partida pode contestar o resultado.';
+  end if;
+
+  if target_match.status <> 'completed'::public.bracket_match_status then
+    raise exception 'Somente resultado finalizado pode ser contestado.';
+  end if;
+
+  if length(btrim(coalesce(target_reason, ''))) < 5 then
+    raise exception 'Informe motivo da contestacao com pelo menos 5 caracteres.';
+  end if;
+
+  select *
+  into target_result
+  from public.match_results
+  where match_id = target_match.id;
+
+  if target_result.id is null then
+    raise exception 'Resultado da partida nao encontrado.';
+  end if;
+
+  perform set_config('app.match_result_write', 'on', true);
+  perform set_config('app.bracket_completion', 'on', true);
+
+  update public.match_results
+  set status = 'disputed'::public.match_result_status,
+      disputed_by = auth.uid(),
+      disputed_at = now(),
+      dispute_reason = btrim(target_reason),
+      updated_at = now()
+  where id = target_result.id;
+
+  insert into public.match_result_history (
+    match_id,
+    result_id,
+    previous_score_a,
+    previous_score_b,
+    new_score_a,
+    new_score_b,
+    previous_winner_registration_id,
+    new_winner_registration_id,
+    previous_status,
+    new_status,
+    changed_by,
+    change_reason
+  )
+  values (
+    target_match.id,
+    target_result.id,
+    target_match.score_a,
+    target_match.score_b,
+    target_match.score_a,
+    target_match.score_b,
+    target_match.winner_registration_id,
+    target_match.winner_registration_id,
+    target_match.status,
+    'disputed'::public.bracket_match_status,
+    auth.uid(),
+    btrim(target_reason)
+  );
+
+  update public.bracket_matches
+  set status = 'disputed'::public.bracket_match_status,
+      updated_at = now()
+  where id = target_match.id;
+
+  perform set_config('app.bracket_completion', 'off', true);
+  perform set_config('app.match_result_write', 'off', true);
+end;
+$$;
+
+comment on function public.contest_match_result(uuid, text) is
+  'Permite que participante da partida conteste resultado finalizado; gestor resolve depois.';
+
+revoke all on function public.contest_match_result(uuid, text) from public;
+grant execute on function public.contest_match_result(uuid, text) to authenticated;
+
+create or replace function public.resolve_match_dispute(
+  target_match_id uuid,
+  target_resolution_action text default 'confirm',
+  target_resolution_notes text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_match public.bracket_matches%rowtype;
+  target_result public.match_results%rowtype;
+  next_match public.bracket_matches%rowtype;
+begin
+  select *
+  into target_match
+  from public.bracket_matches
+  where id = target_match_id;
+
+  if target_match.id is null then
+    raise exception 'Partida da chave nao encontrada.';
+  end if;
+
+  if not public.can_manage_tournament(target_match.tournament_id) then
+    raise exception 'Usuario nao pode resolver contestacao desta chave.';
+  end if;
+
+  select *
+  into target_result
+  from public.match_results
+  where match_id = target_match.id;
+
+  if target_result.id is null
+    or target_result.status <> 'disputed'::public.match_result_status
+  then
+    raise exception 'Nao ha contestacao aberta para esta partida.';
+  end if;
+
+  if target_resolution_action not in ('confirm', 'cancel') then
+    raise exception 'Acao de resolucao invalida. Use confirm ou cancel.';
+  end if;
+
+  if length(btrim(coalesce(target_resolution_notes, ''))) < 3 then
+    raise exception 'Resolucao de contestacao exige observacao.';
+  end if;
+
+  if target_resolution_action = 'cancel'
+    and target_match.next_match_id is not null
+  then
+    select *
+    into next_match
+    from public.bracket_matches
+    where id = target_match.next_match_id;
+
+    if next_match.status in (
+      'completed'::public.bracket_match_status,
+      'live'::public.bracket_match_status,
+      'disputed'::public.bracket_match_status
+    )
+      or next_match.winner_registration_id is not null
+    then
+      raise exception 'Nao e seguro cancelar resultado porque a proxima partida ja possui resultado ou esta em andamento.';
+    end if;
+  end if;
+
+  perform set_config('app.match_result_write', 'on', true);
+  perform set_config('app.bracket_completion', 'on', true);
+
+  if target_resolution_action = 'confirm' then
+    update public.match_results
+    set status = 'resolved'::public.match_result_status,
+        resolved_by = auth.uid(),
+        resolved_at = now(),
+        resolution_notes = btrim(target_resolution_notes),
+        updated_at = now()
+    where id = target_result.id;
+
+    insert into public.match_result_history (
+      match_id,
+      result_id,
+      previous_score_a,
+      previous_score_b,
+      new_score_a,
+      new_score_b,
+      previous_winner_registration_id,
+      new_winner_registration_id,
+      previous_status,
+      new_status,
+      changed_by,
+      change_reason
+    )
+    values (
+      target_match.id,
+      target_result.id,
+      target_match.score_a,
+      target_match.score_b,
+      target_match.score_a,
+      target_match.score_b,
+      target_match.winner_registration_id,
+      target_match.winner_registration_id,
+      target_match.status,
+      'completed'::public.bracket_match_status,
+      auth.uid(),
+      btrim(target_resolution_notes)
+    );
+
+    update public.bracket_matches
+    set status = 'completed'::public.bracket_match_status,
+        updated_at = now()
+    where id = target_match.id;
+  else
+    update public.match_results
+    set status = 'cancelled'::public.match_result_status,
+        resolved_by = auth.uid(),
+        resolved_at = now(),
+        resolution_notes = btrim(target_resolution_notes),
+        updated_at = now()
+    where id = target_result.id;
+
+    insert into public.match_result_history (
+      match_id,
+      result_id,
+      previous_score_a,
+      previous_score_b,
+      new_score_a,
+      new_score_b,
+      previous_winner_registration_id,
+      new_winner_registration_id,
+      previous_status,
+      new_status,
+      changed_by,
+      change_reason
+    )
+    values (
+      target_match.id,
+      target_result.id,
+      target_match.score_a,
+      target_match.score_b,
+      null,
+      null,
+      target_match.winner_registration_id,
+      null,
+      target_match.status,
+      'ready'::public.bracket_match_status,
+      auth.uid(),
+      btrim(target_resolution_notes)
+    );
+
+    if target_match.next_match_id is not null and target_match.next_match_slot = 'a' then
+      update public.bracket_matches
+      set participant_a_registration_id = null,
+          status = case
+            when participant_b_registration_id is null then 'pending'::public.bracket_match_status
+            else status
+          end,
+          updated_at = now()
+      where id = target_match.next_match_id;
+    elsif target_match.next_match_id is not null and target_match.next_match_slot = 'b' then
+      update public.bracket_matches
+      set participant_b_registration_id = null,
+          status = case
+            when participant_a_registration_id is null then 'pending'::public.bracket_match_status
+            else status
+          end,
+          updated_at = now()
+      where id = target_match.next_match_id;
+    end if;
+
+    update public.bracket_matches
+    set status = 'ready'::public.bracket_match_status,
+        score_a = null,
+        score_b = null,
+        winner_registration_id = null,
+        result_notes = null,
+        submitted_by = null,
+        submitted_at = null,
+        confirmed_by = null,
+        confirmed_at = null,
+        updated_at = now()
+    where id = target_match.id;
+  end if;
+
+  perform set_config('app.bracket_completion', 'off', true);
+  perform set_config('app.match_result_write', 'off', true);
+end;
+$$;
+
+comment on function public.resolve_match_dispute(uuid, text, text) is
+  'Admin ou organizador resolve contestacao confirmando o resultado ou cancelando para novo lancamento.';
+
+revoke all on function public.resolve_match_dispute(uuid, text, text) from public;
+grant execute on function public.resolve_match_dispute(uuid, text, text) to authenticated;
+
+drop trigger if exists match_results_set_updated_at on public.match_results;
+create trigger match_results_set_updated_at
+  before update on public.match_results
+  for each row
+  execute function public.set_updated_at();
+
+alter table public.match_results enable row level security;
+alter table public.match_result_history enable row level security;
+
+grant select on public.match_results to anon;
+grant select on public.match_results to authenticated;
+grant select on public.match_result_history to authenticated;
+revoke insert, update, delete on public.match_results from anon, authenticated;
+revoke insert, update, delete on public.match_result_history from anon, authenticated;
+
+drop policy if exists "match_results_select_public" on public.match_results;
+drop policy if exists "match_results_select_manager" on public.match_results;
+drop policy if exists "match_results_select_participant" on public.match_results;
+
+create policy "match_results_select_public"
+  on public.match_results
+  for select
+  to anon, authenticated
+  using (
+    exists (
+      select 1
+      from public.tournaments tournament
+      where tournament.id = tournament_id
+        and tournament.status <> 'draft'::public.tournament_status
+    )
+  );
+
+create policy "match_results_select_manager"
+  on public.match_results
+  for select
+  to authenticated
+  using (public.can_manage_tournament(tournament_id));
+
+create policy "match_results_select_participant"
+  on public.match_results
+  for select
+  to authenticated
+  using (public.is_match_participant(match_id));
+
+drop policy if exists "match_result_history_select_manager" on public.match_result_history;
+drop policy if exists "match_result_history_select_participant" on public.match_result_history;
+
+create policy "match_result_history_select_manager"
+  on public.match_result_history
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.bracket_matches bracket_match
+      where bracket_match.id = match_result_history.match_id
+        and public.can_manage_tournament(bracket_match.tournament_id)
+    )
+  );
+
+create policy "match_result_history_select_participant"
+  on public.match_result_history
+  for select
+  to authenticated
+  using (public.is_match_participant(match_id));

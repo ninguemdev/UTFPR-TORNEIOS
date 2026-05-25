@@ -201,3 +201,13 @@ As regras devem reduzir incentivos para perder de propósito, manipular saldo ou
 - Participante com bye avança automaticamente para a próxima rodada.
 - Resultado de partida pronta exige placar inteiro, não negativo, sem empate e vencedor coerente com o placar.
 - A final concluída define `winner_registration_id` na chave.
+
+## Atualizacao: resultados em mata-mata simples
+
+- Resultado so pode ser registrado em partida `ready` ou `live`; correcao usa partida `completed` ou `disputed` com justificativa.
+- Partida com bye nao recebe placar manual.
+- Empate nao e permitido no `single_elimination`.
+- O vencedor e derivado do placar e precisa ser um dos dois participantes.
+- Ao confirmar, o vencedor alimenta a proxima partida pelo par `next_match_id` e `next_match_slot`.
+- Se uma correcao troca o vencedor e a proxima partida ja tem resultado, esta etapa bloqueia a correcao para evitar chave inconsistente.
+- Participantes podem contestar resultado finalizado; admin ou organizador resolve mantendo ou cancelando o resultado.

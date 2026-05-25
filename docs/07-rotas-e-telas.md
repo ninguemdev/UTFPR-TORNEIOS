@@ -92,3 +92,18 @@ Integrações:
 - `/torneios` exibe ação "Chave" em cada card.
 - `/torneios/:id` exibe ação "Ver chave".
 - `/torneios/:id/participantes` permite gestor preencher seed básico por inscrição.
+
+## Atualizacao: tela de chave e resultados
+
+`/torneios/:id/chave` passa a concentrar:
+
+- visualizacao de rodadas, partidas, byes, placar e vencedor;
+- formulario administrativo de resultado;
+- campo de observacoes do resultado;
+- justificativa obrigatoria para correcao;
+- botao de contestacao para participante autenticado;
+- resolucao administrativa de contestacao;
+- painel simples de resultados contestados;
+- historico por partida carregado sob demanda.
+
+A tela continua mobile-first: a chave aparece como lista por rodada em telas pequenas e sem rolagem horizontal obrigatoria.

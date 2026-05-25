@@ -55,6 +55,12 @@ export type BracketMatchStatus =
   | 'disputed'
   | 'cancelled'
 
+export type MatchResultStatus =
+  | 'confirmed'
+  | 'disputed'
+  | 'resolved'
+  | 'cancelled'
+
 export type Profile = {
   id: string
   email: string | null
@@ -164,8 +170,54 @@ export type BracketMatch = {
   next_match_id: string | null
   next_match_slot: 'a' | 'b' | null
   is_bye: boolean
+  result_notes: string | null
+  submitted_by: string | null
+  submitted_at: string | null
+  confirmed_by: string | null
+  confirmed_at: string | null
   created_at: string
   updated_at: string
+}
+
+export type MatchResult = {
+  id: string
+  match_id: string
+  bracket_id: string
+  tournament_id: string
+  score_a: number
+  score_b: number
+  winner_registration_id: string
+  status: MatchResultStatus
+  notes: string | null
+  submitted_by: string | null
+  submitted_at: string
+  confirmed_by: string | null
+  confirmed_at: string | null
+  disputed_by: string | null
+  disputed_at: string | null
+  dispute_reason: string | null
+  resolved_by: string | null
+  resolved_at: string | null
+  resolution_notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type MatchResultHistory = {
+  id: string
+  match_id: string
+  result_id: string | null
+  previous_score_a: number | null
+  previous_score_b: number | null
+  new_score_a: number | null
+  new_score_b: number | null
+  previous_winner_registration_id: string | null
+  new_winner_registration_id: string | null
+  previous_status: BracketMatchStatus | null
+  new_status: BracketMatchStatus | null
+  changed_by: string | null
+  change_reason: string | null
+  created_at: string
 }
 
 export type Team = {
@@ -391,6 +443,11 @@ export type Database = {
               | 'next_match_id'
               | 'next_match_slot'
               | 'is_bye'
+              | 'result_notes'
+              | 'submitted_by'
+              | 'submitted_at'
+              | 'confirmed_by'
+              | 'confirmed_at'
             >
           >
         Update: Partial<
@@ -405,8 +462,85 @@ export type Database = {
             | 'next_match_id'
             | 'next_match_slot'
             | 'is_bye'
+            | 'result_notes'
+            | 'submitted_by'
+            | 'submitted_at'
+            | 'confirmed_by'
+            | 'confirmed_at'
           >
         >
+        Relationships: []
+      }
+      match_results: {
+        Row: MatchResult
+        Insert: Pick<
+          MatchResult,
+          | 'match_id'
+          | 'bracket_id'
+          | 'tournament_id'
+          | 'score_a'
+          | 'score_b'
+          | 'winner_registration_id'
+        > &
+          Partial<
+            Pick<
+              MatchResult,
+              | 'status'
+              | 'notes'
+              | 'submitted_by'
+              | 'submitted_at'
+              | 'confirmed_by'
+              | 'confirmed_at'
+              | 'disputed_by'
+              | 'disputed_at'
+              | 'dispute_reason'
+              | 'resolved_by'
+              | 'resolved_at'
+              | 'resolution_notes'
+            >
+          >
+        Update: Partial<
+          Pick<
+            MatchResult,
+            | 'score_a'
+            | 'score_b'
+            | 'winner_registration_id'
+            | 'status'
+            | 'notes'
+            | 'submitted_by'
+            | 'submitted_at'
+            | 'confirmed_by'
+            | 'confirmed_at'
+            | 'disputed_by'
+            | 'disputed_at'
+            | 'dispute_reason'
+            | 'resolved_by'
+            | 'resolved_at'
+            | 'resolution_notes'
+          >
+        >
+        Relationships: []
+      }
+      match_result_history: {
+        Row: MatchResultHistory
+        Insert: Pick<MatchResultHistory, 'match_id'> &
+          Partial<
+            Pick<
+              MatchResultHistory,
+              | 'result_id'
+              | 'previous_score_a'
+              | 'previous_score_b'
+              | 'new_score_a'
+              | 'new_score_b'
+              | 'previous_winner_registration_id'
+              | 'new_winner_registration_id'
+              | 'previous_status'
+              | 'new_status'
+              | 'changed_by'
+              | 'change_reason'
+            >
+          >
+        Update: never
         Relationships: []
       }
       teams: {
@@ -479,9 +613,41 @@ export type Database = {
         }
         Returns: void
       }
+      contest_match_result: {
+        Args: {
+          target_match_id: string
+          target_reason: string
+        }
+        Returns: void
+      }
       is_admin: {
         Args: Record<string, never>
         Returns: boolean
+      }
+      is_match_participant: {
+        Args: {
+          target_match_id: string
+        }
+        Returns: boolean
+      }
+      record_bracket_match_result: {
+        Args: {
+          target_match_id: string
+          target_winner_registration_id: string
+          target_score_a: number
+          target_score_b: number
+          target_notes?: string | null
+          target_change_reason?: string | null
+        }
+        Returns: void
+      }
+      resolve_match_dispute: {
+        Args: {
+          target_match_id: string
+          target_resolution_action?: 'confirm' | 'cancel'
+          target_resolution_notes?: string | null
+        }
+        Returns: void
       }
       submit_team_registration: {
         Args: {
@@ -499,6 +665,7 @@ export type Database = {
       registration_type: RegistrationType
       bracket_seeding_method: BracketSeedingMethod
       bracket_match_status: BracketMatchStatus
+      match_result_status: MatchResultStatus
       team_status: TeamStatus
       team_member_role: TeamMemberRole
       team_member_status: TeamMemberStatus

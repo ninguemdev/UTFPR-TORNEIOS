@@ -138,3 +138,21 @@ Limitações mantidas para fases futuras:
 - Sem melhor de N estruturado em jogos internos.
 - Sem auditoria dedicada além dos campos `generated_by`, `generated_at`, vencedor e timestamps.
 - Correção de resultado já finalizado ainda deve ser tratada em fase de disputas/auditoria.
+
+## Atualizacao: Fase 7 parcial
+
+Entregue nesta etapa:
+
+- Formulario de resultado na chave mata-mata.
+- Validacao separada em TypeScript para placar e vencedor.
+- RPC transacional para registrar/corrigir resultado e avancar vencedor.
+- Contestacao por participante da partida.
+- Resolucao administrativa de contestacao.
+- Tabelas `match_results` e `match_result_history` com RLS.
+
+Limites mantidos:
+
+- Sem ranking.
+- Sem melhor de N estruturado.
+- Sem W.O. automatico.
+- Correcoes de vencedor sao bloqueadas quando partidas dependentes ja possuem resultado ou estao em andamento.

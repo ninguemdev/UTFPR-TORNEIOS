@@ -308,3 +308,14 @@ O sorteio puro embaralha participantes uma única vez no serviço de geração e
 Byes são salvos como partidas com `status = bye` e `is_bye = true`. O vencedor dessa partida estrutural já é gravado em `winner_registration_id` e alimenta o próximo slot.
 
 O avanço de vencedor é feito pela RPC `complete_bracket_match`, que exige placar válido, vencedor pertencente à partida e permissão de admin/organizador.
+
+## Atualizacao: validacao de resultados
+
+O MVP implementa validacao de resultado para `single_elimination` em camada separada da UI:
+
+- `validateMatchResult` verifica participantes, status, bye, placar vazio, placar negativo, empate e justificativa de correcao.
+- `determineWinner` calcula o vencedor pelo placar.
+- `isDrawAllowed` prepara expansao futura para formatos que aceitam empate.
+- O banco repete as validacoes sensiveis nas RPCs `record_bracket_match_result`, `contest_match_result` e `resolve_match_dispute`.
+
+Formatos como melhor de 3/5/7, pontos corridos, grupos e W.O. permanecem fora do escopo desta etapa, mas a assinatura da validacao ja separa `format` da regra aplicada.

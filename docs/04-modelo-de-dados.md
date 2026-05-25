@@ -554,3 +554,14 @@ RLS:
 - Admin e organizador autorizado leem, geram, regeram e gerenciam chave do torneio.
 - Usuário comum não escreve em `tournament_brackets` nem `bracket_matches`.
 - Avanço sensível passa pela RPC `complete_bracket_match`, que valida placar e permissão no banco.
+
+## Atualizacao: resultados e auditoria
+
+Novas estruturas do modulo de resultados:
+
+- `match_results`: resultado atual da partida, com placar, vencedor, status, observacoes, usuario que registrou/confirmou, contestacao e resolucao.
+- `match_result_history`: historico imutavel com placar anterior/novo, vencedor anterior/novo, status anterior/novo, usuario responsavel e motivo.
+- `bracket_matches`: mantem placar e vencedor atuais para leitura rapida da chave, alem de `result_notes`, `submitted_by`, `submitted_at`, `confirmed_by` e `confirmed_at`.
+- `match_result_status`: `confirmed`, `disputed`, `resolved`, `cancelled`.
+
+Escritas sensiveis passam por RPCs. `match_results` e `match_result_history` nao recebem permissao direta de insert/update/delete para usuarios autenticados.

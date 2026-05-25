@@ -282,3 +282,16 @@
 - **Passos:** informar placar; sistema valida que não há empate; determina vencedor coerente com o placar; RPC avança vencedor para `next_match_id`.
 - **Erros possíveis:** placar inválido; vencedor fora da partida; partida pendente ou bye; ator sem permissão.
 - **Estado final:** partida fica `completed`; próxima partida recebe participante; final define campeão da chave.
+
+## Atualizacao: fluxo de resultado
+
+Fluxo escolhido para o MVP:
+
+1. Admin ou organizador autorizado registra placar na tela da chave.
+2. O resultado e confirmado imediatamente e o vencedor avanca na chave.
+3. Participante autenticado da partida pode contestar informando motivo.
+4. A partida fica com status `disputed`.
+5. Admin ou organizador resolve a contestacao mantendo o resultado ou cancelando-o para novo lancamento.
+6. Correcoes de resultado finalizado exigem justificativa e entram no historico.
+
+Participante comum nao confirma resultado administrativamente e nao altera partida alheia.
