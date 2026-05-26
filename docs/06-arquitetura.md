@@ -130,6 +130,22 @@ Testes de segurança devem validar RLS e permissões no Supabase quando a integr
 
 ## Supabase recomendado
 
+### Estado atual da infraestrutura Supabase
+
+O projeto ja possui integracao real com Supabase no front-end:
+
+- `src/lib/supabase/client.ts` le `VITE_SUPABASE_URL` e
+  `VITE_SUPABASE_ANON_KEY`.
+- `.env.example` existe sem valores reais.
+- `.env`, `.env.local` e `.env.*.local` nao devem ser versionados.
+- `supabase/schema.sql` permanece como bootstrap consolidado do banco atual.
+- `supabase/README.md` documenta aplicacao do schema, primeiro admin e testes
+  manuais de RLS.
+- `supabase/migrations/` fica reservado para migrations incrementais futuras.
+
+Ainda nao ha `supabase/config.toml`; quando a Supabase CLI for inicializada, o
+fluxo de migrations deve ser incorporado sem apagar `schema.sql`.
+
 ### Cliente front-end
 
 O front-end poderá usar apenas:
@@ -138,6 +154,13 @@ O front-end poderá usar apenas:
 - Chave `anon` pública.
 
 Esses valores devem ficar em variáveis de ambiente públicas do Vite. Chave `service_role` e segredos administrativos nunca devem ser expostos no navegador.
+
+No estado atual, o arquivo `.env.example` deve conter somente:
+
+```text
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
 
 ### Banco PostgreSQL
 

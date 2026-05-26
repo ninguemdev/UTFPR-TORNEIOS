@@ -2,12 +2,33 @@
 
 Os contratos abaixo podem ser implementados como actions locais no MVP e virar endpoints HTTP/RPC no futuro. Entradas e saídas usam nomes em inglês para facilitar tipos TypeScript.
 
-Quando Supabase for implementado:
+Na integracao Supabase atual e nas proximas evolucoes:
 
 - autenticação deve usar Supabase Auth;
 - senhas não devem ser armazenadas em tabela própria;
 - permissões devem ser validadas por RLS, policies e/ou RPCs protegidas;
 - chaves privadas não podem ser usadas no front-end.
+
+## Infraestrutura Supabase
+
+Contratos operacionais atuais:
+
+- O cliente Supabase fica em `src/lib/supabase/client.ts`.
+- O cliente exige `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+- `.env.example` lista apenas variaveis publicas e sem valores reais.
+- `.env`, `.env.local` e `.env.*.local` nao devem ser versionados.
+- `service_role`, JWT secret e senhas de banco nunca entram no front-end.
+- `supabase/schema.sql` e o bootstrap consolidado para ambiente novo.
+- `supabase/migrations/` deve receber apenas mudancas incrementais futuras.
+- Depois de alterar schema, atualizar tipos em `src/lib/supabase/types.ts` ou
+  gerar tipos pela Supabase CLI quando ela estiver configurada.
+
+Fluxo de aplicacao em ambiente novo:
+
+1. Aplicar `supabase/schema.sql` pelo SQL Editor.
+2. Criar usuario pelo app ou Supabase Auth.
+3. Executar `select public.bootstrap_first_admin('UUID_DO_PROFILE_AQUI');`.
+4. Validar RLS com anonimo, usuario comum, organizador autorizado e admin.
 
 ## Criar conta
 

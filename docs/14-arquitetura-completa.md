@@ -94,6 +94,9 @@ VITE_SUPABASE_ANON_KEY
 
 Chave `service_role` nunca deve entrar no front-end.
 
+O arquivo `.env.example` existe apenas como modelo e nao deve conter valores
+reais.
+
 ## 3. Mapa completo de arquivos
 
 Estrutura atual do repositorio:
@@ -101,6 +104,7 @@ Estrutura atual do repositorio:
 ```text
 .
 |-- AGENTS.md
+|-- .env.example
 |-- README.md
 |-- eslint.config.js
 |-- index.html
@@ -114,7 +118,10 @@ Estrutura atual do repositorio:
 |   |-- favicon.svg
 |   `-- icons.svg
 |-- supabase/
-|   `-- schema.sql
+|   |-- README.md
+|   |-- schema.sql
+|   `-- migrations/
+|       `-- README.md
 |-- src/
 |   |-- App.css
 |   |-- App.tsx
@@ -1859,9 +1866,8 @@ Para considerar a arquitetura completa no MVP, ainda faltam estes fechamentos:
 - modelar agenda real de partidas;
 - definir auditoria generica para acoes administrativas;
 - configurar testes automatizados de algoritmos e RLS;
-- adicionar `.env.example` sem segredos;
-- definir processo de migrations versionadas, preferencialmente com Supabase
-  CLI.
+- inicializar Supabase CLI quando o fluxo local for adotado;
+- criar migrations incrementais para novas mudancas de schema.
 
 ## 25. Decisoes arquiteturais
 
@@ -1957,8 +1963,9 @@ VITE_SUPABASE_ANON_KEY
 Regras:
 
 - criar `.env.local` apenas no ambiente do desenvolvedor;
-- nunca commitar `.env.local`, chaves privadas ou `service_role`;
-- adicionar `.env.example` com nomes das variaveis e valores ficticios;
+- nunca commitar `.env`, `.env.local`, `.env.*.local`, chaves privadas ou
+  `service_role`;
+- manter `.env.example` sem valores reais, apenas com os nomes das variaveis;
 - revisar o build para garantir que nenhuma chave privada aparece em assets
   gerados.
 
@@ -1987,21 +1994,28 @@ Para Supabase:
 
 ### Estado atual
 
-O schema principal esta concentrado em `supabase/schema.sql`. Ele cria enums,
-tabelas, indices, triggers, policies, grants e RPCs.
+O schema principal continua concentrado em `supabase/schema.sql`. Ele cria
+enums, tabelas, indices, triggers, policies, grants e RPCs.
 
-Esse formato e suficiente para bootstrap inicial, mas a arquitetura completa
-deve evoluir para migrations versionadas.
+Esse arquivo e o bootstrap consolidado para ambientes novos. A pasta
+`supabase/migrations/` existe para mudancas incrementais futuras e contem um
+README de orientacao. Nenhuma migration inicial gigante foi duplicada nesta
+etapa para evitar duas fontes extensas divergentes antes da Supabase CLI estar
+inicializada.
+
+Ainda nao ha `supabase/config.toml`.
 
 ### Processo recomendado
 
-1. Criar ou alterar tabela/enum/funcoes em migration versionada.
+1. Criar ou alterar tabela/enum/funcoes em migration versionada dentro de
+   `supabase/migrations/`.
 2. Atualizar RLS e grants na mesma mudanca.
 3. Atualizar comentarios SQL quando a regra mudar.
-4. Atualizar `src/lib/supabase/types.ts`.
-5. Atualizar services afetados.
-6. Atualizar docs de modelo, API e arquitetura.
-7. Testar com perfis `anon`, `authenticated user`, criador autorizado e admin.
+4. Atualizar `supabase/schema.sql` para manter o bootstrap consolidado.
+5. Atualizar `src/lib/supabase/types.ts` ou gerar tipos pela Supabase CLI.
+6. Atualizar services afetados.
+7. Atualizar docs de modelo, API e arquitetura.
+8. Testar com perfis `anon`, `authenticated user`, criador autorizado e admin.
 
 ### Regras para migrations futuras
 
@@ -2215,18 +2229,19 @@ Pontos importantes do estado atual:
 
 Ao alterar uma funcionalidade:
 
-1. Atualizar tipos em `src/lib/supabase/types.ts` quando alterar o schema.
-2. Atualizar `supabase/schema.sql` com RLS, grants e policies.
-3. Garantir que regra sensivel esteja no banco, nao so no React.
-4. Manter funcoes puras em `src/lib/tournaments` quando a logica puder ser
+1. Criar migration incremental quando alterar o banco.
+2. Atualizar tipos em `src/lib/supabase/types.ts` quando alterar o schema.
+3. Atualizar `supabase/schema.sql` com RLS, grants e policies.
+4. Garantir que regra sensivel esteja no banco, nao so no React.
+5. Manter funcoes puras em `src/lib/tournaments` quando a logica puder ser
    testada fora da UI.
-5. Manter chamadas ao Supabase isoladas em `src/services`.
-6. Preservar estados de loading, erro, sucesso e vazio.
-7. Verificar responsividade de 320px a desktop.
-8. Usar labels, botoes reais, links reais e foco visivel.
-9. Rodar `npm run lint`.
-10. Rodar `npm run build`.
-11. Atualizar docs relacionados em `docs/`.
+6. Manter chamadas ao Supabase isoladas em `src/services`.
+7. Preservar estados de loading, erro, sucesso e vazio.
+8. Verificar responsividade de 320px a desktop.
+9. Usar labels, botoes reais, links reais e foco visivel.
+10. Rodar `npm run lint`.
+11. Rodar `npm run build`.
+12. Atualizar docs relacionados em `docs/`.
 
 ## 33. Como aplicar o schema no Supabase
 
@@ -2248,6 +2263,8 @@ Depois disso:
 - usuario comum consegue pedir permissao;
 - criador autorizado consegue criar torneios proprios;
 - RLS continua controlando leitura/escrita.
+
+O guia operacional completo fica em `supabase/README.md`.
 
 ## 34. Onde testar cada area
 

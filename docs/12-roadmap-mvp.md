@@ -173,3 +173,27 @@ Limites mantidos:
 - O ranking de mata-mata simples nao foi transformado em classificacao completa.
 - Snapshots SQL estao preparados, mas a tela atual recalcula em tempo de leitura a partir dos dados disponiveis.
 - W.O., Elo, sistema suico e estatisticas avancadas continuam fora do MVP desta etapa.
+
+## Atualizacao: base de infraestrutura Supabase
+
+Entregue nesta etapa:
+
+- `.env.example` sem segredos reais com `VITE_SUPABASE_URL` e
+  `VITE_SUPABASE_ANON_KEY`.
+- `.gitignore` cobrindo `.env`, `.env.local` e `.env.*.local`.
+- `supabase/README.md` documentando bootstrap por `schema.sql`, primeiro admin,
+  regras de seguranca e teste manual de RLS.
+- `supabase/migrations/README.md` criando a estrutura para migrations
+  incrementais futuras.
+
+Decisao:
+
+- `supabase/schema.sql` continua como bootstrap consolidado do estado atual.
+- Nenhuma migration inicial gigante foi duplicada antes da Supabase CLI estar
+  inicializada, para evitar duas fontes extensas divergentes.
+
+Limites mantidos:
+
+- Ainda nao ha `supabase/config.toml`.
+- Tipos em `src/lib/supabase/types.ts` continuam manuais ate a geracao por CLI
+  ser adotada.

@@ -4,6 +4,21 @@
 
 Garantir que regras de torneio, ranking, geração de partidas, permissões e interfaces funcionem de forma previsível e auditável.
 
+## Validacao da infraestrutura Supabase
+
+Antes de continuar funcionalidades grandes, validar:
+
+- `.env.example` existe e nao contem chaves reais.
+- `.env`, `.env.local` e `.env.*.local` estao ignorados pelo Git.
+- `src/lib/supabase/client.ts` falha com erro claro quando variaveis publicas
+  obrigatorias nao existem.
+- O front-end usa somente `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+- Nenhuma `service_role`, JWT secret, senha de banco ou token administrativo
+  aparece em arquivos versionados.
+- `supabase/schema.sql` aplica em ambiente novo.
+- `supabase/README.md` explica bootstrap, migrations, primeiro admin e RLS.
+- `supabase/migrations/` existe para mudancas incrementais futuras.
+
 ## Testes unitários para algoritmos
 
 - Geração de chave mata-mata.
@@ -91,9 +106,10 @@ Garantir que regras de torneio, ranking, geração de partidas, permissões e in
 
 ## Testes de RLS e banco
 
-Quando Supabase for implementado, criar testes ou validações manuais com usuários diferentes:
+Como Supabase ja esta integrado, criar testes ou validações manuais com usuários diferentes:
 
-- RLS habilitado em `profiles`, `tournaments`, `registrations`, `teams`, `matches`, `match_results`, `disputes`, `audit_logs`, `global_settings`, `tournament_creator_requests` e `tournament_creator_permissions`.
+- RLS habilitado nas tabelas atuais: `profiles`, `tournament_creator_requests`, `tournament_creator_permissions`, `tournaments`, `tournament_registrations`, `teams`, `team_members`, `tournament_brackets`, `bracket_matches`, `match_results`, `match_result_history`, `tournament_standings` e `standing_entries`.
+- Tabelas futuras como `audit_logs`, `global_settings`, `action_locks`, grupos e agenda tambem devem nascer com RLS.
 - Usuário A não lê dados privados do usuário B.
 - Usuário A não atualiza perfil do usuário B.
 - Usuário comum não altera `profiles.role`.

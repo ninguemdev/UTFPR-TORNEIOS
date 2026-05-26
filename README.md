@@ -40,6 +40,35 @@ Gerar build:
 npm run build
 ```
 
+## Configuracao local
+
+Crie um `.env.local` a partir de `.env.example`:
+
+```text
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
+
+Use apenas a URL publica do projeto Supabase e a chave `anon` publica no
+front-end. Nunca coloque `service_role`, JWT secret, senha de banco ou token
+administrativo no repositorio.
+
+Arquivos `.env`, `.env.local` e `.env.*.local` ficam ignorados pelo Git.
+
+## Supabase e migrations
+
+O bootstrap atual do banco esta em `supabase/schema.sql`. Para ambientes novos,
+aplique esse arquivo pelo SQL Editor do Supabase e depois promova o primeiro
+admin com:
+
+```sql
+select public.bootstrap_first_admin('UUID_DO_PROFILE_AQUI');
+```
+
+A pasta `supabase/migrations/` esta reservada para migrations incrementais
+daqui em diante. Veja `supabase/README.md` para o fluxo de schema, migrations,
+seguranca e testes manuais de RLS.
+
 ## Documentação
 
 - [00 - Visão geral](docs/00-visao-geral.md)
@@ -56,6 +85,7 @@ npm run build
 - [11 - Testes e validação](docs/11-testes-e-validacao.md)
 - [12 - Roadmap MVP](docs/12-roadmap-mvp.md)
 - [13 - Checklist de code review](docs/13-checklist-code-review.md)
+- [14 - Arquitetura completa](docs/14-arquitetura-completa.md)
 
 ## Escopo inicial
 
