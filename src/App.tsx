@@ -49,6 +49,7 @@ import { PublicTournamentPage as SupabasePublicTournamentPage } from './pages/to
 import { TeamDetailsPage as SupabaseTeamDetailsPage } from './pages/tournaments/TeamDetailsPage'
 import { TournamentBracketPage as SupabaseTournamentBracketPage } from './pages/tournaments/TournamentBracketPage'
 import { TournamentParticipantsPage as SupabaseTournamentParticipantsPage } from './pages/tournaments/TournamentParticipantsPage'
+import { TournamentRankingPage as SupabaseTournamentRankingPage } from './pages/tournaments/TournamentRankingPage'
 import { TournamentTeamsPage as SupabaseTournamentTeamsPage } from './pages/tournaments/TournamentTeamsPage'
 import { TournamentsPage as SupabaseTournamentsPage } from './pages/tournaments/TournamentsPage'
 
@@ -158,6 +159,15 @@ function AppRouter() {
     )
   }
 
+  const rankingTournamentMatch = normalizedRoute.match(/^\/torneios\/([^/]+)\/ranking$/)
+  if (rankingTournamentMatch) {
+    return (
+      <SupabaseTournamentRankingPage
+        tournamentId={decodeURIComponent(rankingTournamentMatch[1])}
+      />
+    )
+  }
+
   const teamDetailsMatch = normalizedRoute.match(/^\/torneios\/([^/]+)\/equipes\/([^/]+)$/)
   if (teamDetailsMatch) {
     return (
@@ -235,7 +245,7 @@ function AppRouter() {
     case '/acesso-negado':
       return <AccessDeniedPage />
     default:
-      return <TournamentDemoApp route={normalizedRoute} />
+      return <TournamentDemoApp key={normalizedRoute} route={normalizedRoute} />
   }
 }
 
@@ -274,10 +284,6 @@ function TournamentDemoApp({ route }: { route: string }) {
     const timer = window.setTimeout(() => setToast(''), 3600)
     return () => window.clearTimeout(timer)
   }, [toast])
-
-  useEffect(() => {
-    setActivePage(getDemoPageFromRoute(route))
-  }, [route])
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {

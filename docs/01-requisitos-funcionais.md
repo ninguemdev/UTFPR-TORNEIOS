@@ -204,3 +204,12 @@ Prioridades:
 | RF-081 | Permitir contestacao por participante. | MVP | Participante autenticado da partida muda o resultado para `disputed` com motivo registrado. |
 | RF-082 | Resolver contestacao administrativamente. | MVP | Admin ou organizador confirma o resultado contestado ou cancela o resultado para novo lancamento. |
 | RF-083 | Auditar alteracoes de resultado. | MVP | Criacao, correcao, contestacao e resolucao criam linha em `match_result_history`. |
+
+## Atualizacao: ranking basico
+
+| Codigo | Descricao | Prioridade | Criterio de aceite |
+| --- | --- | --- | --- |
+| RF-084 | Calcular ranking basico para formatos de tabela. | MVP | Ranking mostra pontos, jogos, vitorias, empates, derrotas, `score_for`, `score_against`, `score_diff` e posicao. |
+| RF-085 | Exibir criterios de desempate. | MVP | Tela mostra pontos, vitorias, saldo, score pro, confronto direto quando aplicavel e fallback por seed/nome. |
+| RF-086 | Ignorar partidas sem resultado confiavel. | MVP | Partidas pendentes, canceladas, com bye ou contestadas nao entram no calculo. |
+| RF-087 | Indicar empate tecnico. | MVP | Se os criterios principais nao separarem participantes, a interface indica empate tecnico. |

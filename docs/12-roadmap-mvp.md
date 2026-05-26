@@ -152,7 +152,24 @@ Entregue nesta etapa:
 
 Limites mantidos:
 
-- Sem ranking.
+- Ranking basico ja possui algoritmo e tela preparada, mas ainda nao ha gerador proprio de pontos corridos/grupos.
 - Sem melhor de N estruturado.
 - Sem W.O. automatico.
 - Correcoes de vencedor sao bloqueadas quando partidas dependentes ja possuem resultado ou estao em andamento.
+
+## Atualizacao: Fase 8 parcial - ranking basico
+
+Entregue nesta etapa:
+
+- Algoritmo puro em TypeScript para ranking por pontos.
+- Pontuacao padrao 3/1/0 preparada para configuracao futura.
+- Criterios explicitos: pontos, vitorias, saldo, score pro, confronto direto quando aplicavel e fallback por seed/nome.
+- Tela `/torneios/:id/ranking` com estados de loading, erro, vazio, aviso provisorio e tabela responsiva.
+- Estrutura SQL `tournament_standings` e `standing_entries` com RLS para snapshots futuros.
+
+Limites mantidos:
+
+- Ainda nao ha geracao real de calendario round robin ou grupos.
+- O ranking de mata-mata simples nao foi transformado em classificacao completa.
+- Snapshots SQL estao preparados, mas a tela atual recalcula em tempo de leitura a partir dos dados disponiveis.
+- W.O., Elo, sistema suico e estatisticas avancadas continuam fora do MVP desta etapa.

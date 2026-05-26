@@ -362,3 +362,26 @@ Consultas:
 
 - `match_results` pode ser lido publicamente em torneios publicados.
 - `match_result_history` e restrito a gestor ou participante autenticado da partida.
+
+## Atualizacao: contratos de ranking
+
+### Calcular ranking no front-end
+
+- **Modulo:** `src/lib/tournaments/ranking.ts`.
+- **Entrada:** participantes, partidas finalizadas, status de resultado e configuracao de pontos.
+- **Saida:** entradas ordenadas, resumo de criterios, partidas contabilizadas/ignoradas e indicador de empate tecnico.
+- **Regra:** a funcao ignora partidas que nao estejam `completed` ou que tenham resultado `disputed`/`cancelled`.
+
+### Buscar ranking do torneio
+
+- **Acao:** `fetchTournamentRanking(tournamentId)`.
+- **Saida:** torneio, participantes elegiveis, partidas mapeadas e resultado calculado.
+- **Permissoes:** leitura segue RLS de torneios, inscricoes, partidas e resultados.
+- **Limitacao:** no MVP, formatos `round_robin`, `groups` e `groups_playoffs` estao preparados para ranking; a geracao propria dessas partidas ainda nao foi implementada.
+
+### Snapshots SQL
+
+- **Tabelas:** `tournament_standings` e `standing_entries`.
+- **Leitura:** publica para torneios publicados.
+- **Escrita:** apenas admin ou organizador autorizado por `public.can_manage_tournament(tournament_id)`.
+- **Uso esperado:** persistir ranking oficial/provisorio quando houver gerador de pontos corridos ou grupos.

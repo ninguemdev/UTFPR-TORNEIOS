@@ -116,3 +116,15 @@ Integrações:
 - historico por partida carregado sob demanda.
 
 A tela continua mobile-first: a chave aparece como lista por rodada em telas pequenas e sem rolagem horizontal obrigatoria.
+
+## Atualizacao: tela de ranking
+
+### `/torneios/:id/ranking`
+
+- **Objetivo:** exibir classificacao basica por pontos para formatos de tabela.
+- **Usuario principal:** visitante para leitura publica; admin/organizador para recalculo.
+- **Componentes:** resumo do torneio, criterios de desempate, aviso provisorio, tabela de ranking, estado vazio, loading e erro.
+- **Dados exibidos:** posicao, participante, pontos, jogos, vitorias, empates, derrotas, score pro, score contra, saldo e resumo de desempate.
+- **Regras:** a home nao possui botao de voltar; esta tela usa o layout global com header e botao "Voltar".
+- **Navegacao:** `/torneios` e `/torneios/:id` exibem link para "Ranking".
+- **Limitacao:** `single_elimination` mostra aviso de que ranking completo de mata-mata fica para etapa futura.

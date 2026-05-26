@@ -211,3 +211,12 @@ As regras devem reduzir incentivos para perder de propósito, manipular saldo ou
 - Ao confirmar, o vencedor alimenta a proxima partida pelo par `next_match_id` e `next_match_slot`.
 - Se uma correcao troca o vencedor e a proxima partida ja tem resultado, esta etapa bloqueia a correcao para evitar chave inconsistente.
 - Participantes podem contestar resultado finalizado; admin ou organizador resolve mantendo ou cancelando o resultado.
+
+## Atualizacao: ranking basico por pontos
+
+- O ranking de pontos corridos e grupos usa pontuacao padrao: vitoria = 3, empate = 1 e derrota = 0.
+- As estatisticas calculadas sao: jogos, vitorias, empates, derrotas, `score_for`, `score_against`, `score_diff`, pontos e posicao.
+- O calculo considera apenas partidas finalizadas com resultado confirmado ou resolvido; partidas pendentes, canceladas, com bye ou contestadas ficam fora.
+- A ordem padrao de desempate e: pontos, vitorias, saldo, score pro, confronto direto quando houver exatamente dois participantes empatados e fallback estavel por seed/nome.
+- O fallback por seed/nome nao resolve o empate esportivo; ele apenas estabiliza a exibicao. A interface deve indicar empate tecnico quando os criterios principais continuarem iguais.
+- No MVP, mata-mata simples nao e convertido em ranking completo. Campeao/finalistas podem virar ranking proprio em etapa futura.

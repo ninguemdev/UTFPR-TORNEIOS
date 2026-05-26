@@ -295,3 +295,21 @@ Fluxo escolhido para o MVP:
 6. Correcoes de resultado finalizado exigem justificativa e entram no historico.
 
 Participante comum nao confirma resultado administrativamente e nao altera partida alheia.
+
+## Atualizacao: fluxo de ranking
+
+### Visitante consulta ranking
+
+- **Ator:** visitante ou usuario autenticado.
+- **Pre-condicoes:** torneio publicado.
+- **Passos:** abrir `/torneios/:id/ranking`; sistema carrega participantes elegiveis e partidas finalizadas/confirmadas; tela mostra criterios e tabela.
+- **Erros possiveis:** torneio em rascunho, sem permissao de leitura, formato ainda sem ranking completo.
+- **Estado final:** visitante entende pontuacao, desempates e se o ranking esta vazio/provisorio.
+
+### Organizador recalcula ranking
+
+- **Ator:** admin ou organizador autorizado.
+- **Pre-condicoes:** permissao validada por `can_manage_tournament`.
+- **Passos:** abrir ranking; acionar recalculo; sistema refaz o calculo a partir dos resultados confirmados.
+- **Erros possiveis:** RLS negando leitura, partidas contestadas ignoradas, formato sem gerador de tabela.
+- **Estado final:** classificacao exibida reflete o estado atual dos resultados confiaveis.

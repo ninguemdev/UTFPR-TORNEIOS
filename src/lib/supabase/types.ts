@@ -220,6 +220,45 @@ export type MatchResultHistory = {
   created_at: string
 }
 
+export type TournamentStanding = {
+  id: string
+  tournament_id: string
+  group_id: string | null
+  scope: string
+  status: 'provisional' | 'official' | 'archived'
+  win_points: number
+  draw_points: number
+  loss_points: number
+  tie_breakers: string[]
+  calculated_by: string | null
+  calculated_at: string
+  created_at: string
+  updated_at: string
+}
+
+export type StandingEntry = {
+  id: string
+  standing_id: string
+  tournament_id: string
+  group_id: string | null
+  participant_registration_id: string
+  team_id: string | null
+  display_name: string
+  played: number
+  wins: number
+  draws: number
+  losses: number
+  score_for: number
+  score_against: number
+  score_diff: number
+  points: number
+  position: number
+  tie_breaker_summary: string
+  is_technical_tie: boolean
+  created_at: string
+  updated_at: string
+}
+
 export type Team = {
   id: string
   tournament_id: string
@@ -541,6 +580,87 @@ export type Database = {
             >
           >
         Update: never
+        Relationships: []
+      }
+      tournament_standings: {
+        Row: TournamentStanding
+        Insert: Pick<TournamentStanding, 'tournament_id'> &
+          Partial<
+            Pick<
+              TournamentStanding,
+              | 'group_id'
+              | 'scope'
+              | 'status'
+              | 'win_points'
+              | 'draw_points'
+              | 'loss_points'
+              | 'tie_breakers'
+              | 'calculated_by'
+              | 'calculated_at'
+            >
+          >
+        Update: Partial<
+          Pick<
+            TournamentStanding,
+            | 'group_id'
+            | 'scope'
+            | 'status'
+            | 'win_points'
+            | 'draw_points'
+            | 'loss_points'
+            | 'tie_breakers'
+            | 'calculated_by'
+            | 'calculated_at'
+          >
+        >
+        Relationships: []
+      }
+      standing_entries: {
+        Row: StandingEntry
+        Insert: Pick<
+          StandingEntry,
+          | 'standing_id'
+          | 'tournament_id'
+          | 'participant_registration_id'
+          | 'display_name'
+          | 'position'
+          | 'tie_breaker_summary'
+        > &
+          Partial<
+            Pick<
+              StandingEntry,
+              | 'group_id'
+              | 'team_id'
+              | 'played'
+              | 'wins'
+              | 'draws'
+              | 'losses'
+              | 'score_for'
+              | 'score_against'
+              | 'score_diff'
+              | 'points'
+              | 'is_technical_tie'
+            >
+          >
+        Update: Partial<
+          Pick<
+            StandingEntry,
+            | 'group_id'
+            | 'team_id'
+            | 'display_name'
+            | 'played'
+            | 'wins'
+            | 'draws'
+            | 'losses'
+            | 'score_for'
+            | 'score_against'
+            | 'score_diff'
+            | 'points'
+            | 'position'
+            | 'tie_breaker_summary'
+            | 'is_technical_tie'
+          >
+        >
         Relationships: []
       }
       teams: {

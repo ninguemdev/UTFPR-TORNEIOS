@@ -319,3 +319,30 @@ O MVP implementa validacao de resultado para `single_elimination` em camada sepa
 - O banco repete as validacoes sensiveis nas RPCs `record_bracket_match_result`, `contest_match_result` e `resolve_match_dispute`.
 
 Formatos como melhor de 3/5/7, pontos corridos, grupos e W.O. permanecem fora do escopo desta etapa, mas a assinatura da validacao ja separa `format` da regra aplicada.
+
+## Atualizacao: algoritmo de ranking
+
+O ranking basico fica em `src/lib/tournaments/ranking.ts` como funcao pura testavel. Entrada minima:
+
+- participantes com `id`, nome exibido e seed opcional;
+- partidas com participantes A/B, placares, status da partida e status do resultado;
+- configuracao de pontos (`winPoints`, `drawPoints`, `lossPoints`).
+
+Fluxo:
+
+```text
+func calcularRanking(participantes, partidas, pontuacao):
+  criar estatisticas zeradas por participante
+  para cada partida:
+    se status nao for completed, ignorar
+    se resultado estiver disputed ou cancelled, ignorar
+    se faltar participante ou placar, ignorar
+    somar jogos, vitorias, empates, derrotas, score_for e score_against
+    aplicar pontos: vitoria 3, empate 1, derrota 0 por padrao
+  calcular score_diff
+  ordenar por pontos, vitorias, score_diff, score_for, confronto direto, seed e nome
+  marcar empate tecnico quando criterios principais e confronto direto continuarem iguais
+  retornar entradas ordenadas e resumo de criterios
+```
+
+Confronto direto e aplicado apenas quando a comparacao envolve exatamente dois participantes empatados. Em empate multiplo, o MVP mantem empate tecnico e usa seed/nome somente como fallback visual estavel, sem declarar vantagem esportiva.

@@ -3799,3 +3799,184 @@ create policy "match_result_history_select_participant"
   for select
   to authenticated
   using (public.is_match_participant(match_id));
+
+-- ---------------------------------------------------------------------------
+-- Rankings e classificacoes por pontos
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.tournament_standings (
+  id uuid primary key default extensions.gen_random_uuid(),
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  group_id text,
+  scope text not null default 'overall',
+  status text not null default 'provisional',
+  win_points integer not null default 3,
+  draw_points integer not null default 1,
+  loss_points integer not null default 0,
+  tie_breakers text[] not null default array[
+    'points',
+    'wins',
+    'score_diff',
+    'score_for',
+    'head_to_head',
+    'seed_or_name'
+  ],
+  calculated_by uuid references public.profiles(id) on delete set null,
+  calculated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint tournament_standings_scope_not_blank check (length(btrim(scope)) > 0),
+  constraint tournament_standings_status_allowed check (
+    status in ('provisional', 'official', 'archived')
+  ),
+  constraint tournament_standings_points_non_negative check (
+    win_points >= 0
+    and draw_points >= 0
+    and loss_points >= 0
+  )
+);
+
+comment on table public.tournament_standings is
+  'Snapshot de ranking por torneio ou grupo. O calculo deve vir de resultados confirmados, nao de edicao manual de usuario comum.';
+comment on column public.tournament_standings.tie_breakers is
+  'Ordem explicita de desempate: points, wins, score_diff, score_for, head_to_head e fallback estavel por seed_or_name.';
+
+create table if not exists public.standing_entries (
+  id uuid primary key default extensions.gen_random_uuid(),
+  standing_id uuid not null references public.tournament_standings(id) on delete cascade,
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  group_id text,
+  participant_registration_id uuid not null references public.tournament_registrations(id) on delete cascade,
+  team_id uuid references public.teams(id) on delete set null,
+  display_name text not null,
+  played integer not null default 0,
+  wins integer not null default 0,
+  draws integer not null default 0,
+  losses integer not null default 0,
+  score_for integer not null default 0,
+  score_against integer not null default 0,
+  score_diff integer not null default 0,
+  points integer not null default 0,
+  position integer not null,
+  tie_breaker_summary text not null,
+  is_technical_tie boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint standing_entries_display_name_not_blank check (length(btrim(display_name)) > 0),
+  constraint standing_entries_position_positive check (position > 0),
+  constraint standing_entries_stats_non_negative check (
+    played >= 0
+    and wins >= 0
+    and draws >= 0
+    and losses >= 0
+    and score_for >= 0
+    and score_against >= 0
+    and points >= 0
+  ),
+  constraint standing_entries_played_consistency check (
+    played = wins + draws + losses
+  ),
+  constraint standing_entries_score_diff_consistency check (
+    score_diff = score_for - score_against
+  )
+);
+
+comment on table public.standing_entries is
+  'Linhas do snapshot de ranking com estatisticas basicas e resumo do criterio de desempate aplicado.';
+comment on column public.standing_entries.score_for is
+  'Score, gols, rounds ou pontos feitos pelo participante/equipe.';
+comment on column public.standing_entries.score_against is
+  'Score, gols, rounds ou pontos sofridos pelo participante/equipe.';
+comment on column public.standing_entries.score_diff is
+  'Saldo calculado como score_for - score_against.';
+
+create unique index if not exists tournament_standings_unique_scope
+  on public.tournament_standings (tournament_id, scope, coalesce(group_id, ''));
+
+create unique index if not exists standing_entries_unique_participant
+  on public.standing_entries (standing_id, participant_registration_id);
+
+create index if not exists tournament_standings_tournament_idx
+  on public.tournament_standings (tournament_id);
+
+create index if not exists standing_entries_tournament_position_idx
+  on public.standing_entries (tournament_id, group_id, position);
+
+drop trigger if exists tournament_standings_set_updated_at on public.tournament_standings;
+create trigger tournament_standings_set_updated_at
+  before update on public.tournament_standings
+  for each row
+  execute function public.set_updated_at();
+
+drop trigger if exists standing_entries_set_updated_at on public.standing_entries;
+create trigger standing_entries_set_updated_at
+  before update on public.standing_entries
+  for each row
+  execute function public.set_updated_at();
+
+alter table public.tournament_standings enable row level security;
+alter table public.standing_entries enable row level security;
+
+grant select on public.tournament_standings to anon, authenticated;
+grant select on public.standing_entries to anon, authenticated;
+grant insert, update, delete on public.tournament_standings to authenticated;
+grant insert, update, delete on public.standing_entries to authenticated;
+
+drop policy if exists "standings_select_public" on public.tournament_standings;
+drop policy if exists "standings_select_manager" on public.tournament_standings;
+drop policy if exists "standings_write_manager" on public.tournament_standings;
+drop policy if exists "standing_entries_select_public" on public.standing_entries;
+drop policy if exists "standing_entries_select_manager" on public.standing_entries;
+drop policy if exists "standing_entries_write_manager" on public.standing_entries;
+
+create policy "standings_select_public"
+  on public.tournament_standings
+  for select
+  to anon, authenticated
+  using (
+    exists (
+      select 1
+      from public.tournaments tournament
+      where tournament.id = tournament_id
+        and tournament.status <> 'draft'::public.tournament_status
+    )
+  );
+
+create policy "standings_select_manager"
+  on public.tournament_standings
+  for select
+  to authenticated
+  using (public.can_manage_tournament(tournament_id));
+
+create policy "standings_write_manager"
+  on public.tournament_standings
+  for all
+  to authenticated
+  using (public.can_manage_tournament(tournament_id))
+  with check (public.can_manage_tournament(tournament_id));
+
+create policy "standing_entries_select_public"
+  on public.standing_entries
+  for select
+  to anon, authenticated
+  using (
+    exists (
+      select 1
+      from public.tournaments tournament
+      where tournament.id = tournament_id
+        and tournament.status <> 'draft'::public.tournament_status
+    )
+  );
+
+create policy "standing_entries_select_manager"
+  on public.standing_entries
+  for select
+  to authenticated
+  using (public.can_manage_tournament(tournament_id));
+
+create policy "standing_entries_write_manager"
+  on public.standing_entries
+  for all
+  to authenticated
+  using (public.can_manage_tournament(tournament_id))
+  with check (public.can_manage_tournament(tournament_id));

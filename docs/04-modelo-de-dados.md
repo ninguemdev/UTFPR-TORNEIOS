@@ -565,3 +565,37 @@ Novas estruturas do modulo de resultados:
 - `match_result_status`: `confirmed`, `disputed`, `resolved`, `cancelled`.
 
 Escritas sensiveis passam por RPCs. `match_results` e `match_result_history` nao recebem permissao direta de insert/update/delete para usuarios autenticados.
+
+## Atualizacao: standings/ranking
+
+Foram adicionadas estruturas de snapshot para rankings de pontos corridos e grupos:
+
+### TournamentStanding
+
+- `id`: uuid.
+- `tournament_id`: FK para `tournaments`.
+- `group_id`: texto opcional para grupos futuros.
+- `scope`: escopo logico, por padrao `overall`.
+- `status`: `provisional | official | archived`.
+- `win_points`, `draw_points`, `loss_points`: configuracao de pontuacao usada no snapshot.
+- `tie_breakers`: ordem explicita de desempate.
+- `calculated_by` e `calculated_at`: auditoria de recalculo.
+- `created_at` e `updated_at`.
+
+### StandingEntry
+
+- `standing_id`, `tournament_id`, `group_id`.
+- `participant_registration_id` e `team_id` opcional.
+- `display_name`.
+- `played`, `wins`, `draws`, `losses`.
+- `score_for`, `score_against`, `score_diff`.
+- `points`, `position`.
+- `tie_breaker_summary` e `is_technical_tie`.
+
+RLS:
+
+- Visitantes e autenticados leem standings de torneios publicados.
+- Admin e organizador autorizado podem criar, atualizar e apagar snapshots do torneio que gerenciam.
+- Usuario comum nao manipula ranking manualmente.
+
+No MVP, a tela calcula a classificacao em TypeScript a partir de partidas finalizadas/confirmadas disponiveis. As tabelas de snapshot preparam persistencia e auditoria de rankings oficiais quando pontos corridos/grupos tiverem gerador proprio.

@@ -300,3 +300,30 @@ Casos obrigatorios:
 - Contestacao: participante muda partida para `disputed`.
 - Historico: cada registro, correcao, contestacao e resolucao cria linha em `match_result_history`.
 - Vencedor avancando: `next_match_id` recebe vencedor no slot correto.
+
+## Atualizacao: testes de ranking
+
+O ranking foi isolado em `src/lib/tournaments/ranking.ts` para permitir cobertura futura por Vitest/Jest.
+
+Casos minimos:
+
+- Vitoria simples: A 2 x 0 B gera 3 pontos para A, vitoria para A e derrota para B.
+- Empate: A 1 x 1 B gera 1 ponto e um empate para cada.
+- Derrota: lado perdedor recebe 0 ponto e uma derrota.
+- Saldo: `score_diff` deve ser `score_for - score_against`.
+- Ordenacao por pontos: maior pontuacao aparece antes.
+- Ordenacao por vitorias: empate em pontos usa vitorias.
+- Ordenacao por saldo: empate em pontos/vitorias usa saldo.
+- Ordenacao por score pro: empate nos criterios anteriores usa `score_for`.
+- Empate tecnico: criterios principais e confronto direto iguais marcam `isTechnicalTie`.
+- Partida pendente ignorada: status diferente de `completed` nao altera estatisticas.
+- Partida contestada ignorada: `resultStatus = disputed` nao altera estatisticas.
+- Resultado alterado: recalcular com nova lista de partidas atualiza pontos, saldo e posicoes.
+
+Validacao manual pela UI:
+
+- Abrir `/torneios/:id/ranking`.
+- Conferir estado vazio quando nao ha partidas finalizadas.
+- Conferir aviso para mata-mata simples.
+- Como admin/organizador, usar "Recalcular ranking" e confirmar que a tela recarrega dados derivados.
+- Como usuario comum/visitante, confirmar que nao aparece acao administrativa.
