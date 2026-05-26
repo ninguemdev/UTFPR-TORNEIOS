@@ -194,6 +194,7 @@ Estrutura atual do repositorio:
 |   |       |-- TournamentTeamsPage.tsx
 |   |       `-- TournamentsPage.tsx
 |   `-- services/
+|       |-- admin.ts
 |       |-- brackets.ts
 |       |-- rankings.ts
 |       |-- teams.ts
@@ -1811,10 +1812,10 @@ Ela deve ser atualizada sempre que uma funcionalidade sair de `Parcial` ou
 | Ranking basico | Implementado | `ranking.ts`, `TournamentRankingPage` | Calcula no cliente a partir de partidas disponiveis. |
 | Snapshot oficial de ranking | Parcial | `tournament_standings`, `standing_entries` | Schema e RLS existem; falta servico/RPC para gravar snapshot. |
 | Painel do organizador | Parcial | edicao, participantes, chave, equipes | Nao existe dashboard dedicado com metricas e alertas. |
-| Painel admin | Parcial | `AdminHomePage`, `AdminCreatorRequestsPage` | Cobre pedidos/permissoes; faltam configuracoes globais, locks e auditoria geral. |
+| Painel admin | Parcial | `AdminHomePage`, `AdminCreatorRequestsPage` | Cobre pedidos/permissoes, auditoria geral e bloqueios; falta configuracao global completa. |
 | Pagina publica do torneio | Implementado | `PublicTournamentPage` | Mostra dados, participantes e acoes de inscricao conforme tipo. |
-| Auditoria geral | Parcial | historico de resultados e campos administrativos | Falta `audit_logs` generico para todas as acoes sensiveis. |
-| Bloqueios administrativos | Pendente | docs | Falta `action_locks` e policies/funcoes associadas. |
+| Auditoria geral | Parcial | `audit_logs`, triggers e historico de resultados | Base generica implementada; faltam IP/user-agent e cobertura de modulos futuros. |
+| Bloqueios administrativos | Parcial | `action_locks`, RLS, painel admin e triggers | Bloqueia acoes principais; faltam configuracoes globais e integracao visual em todas as telas publicas. |
 | Notificacoes | Futuro | docs | Nao ha modelo nem UI. |
 | Responsividade/acessibilidade | Parcial | CSS global, componentes, checklist | Ha padrao aplicado, mas precisa validacao periodica em 320px, teclado e leitor de tela. |
 | Testes automatizados | Pendente | scripts `lint` e `build` apenas | Nao ha runner de testes unitarios/componentes/RLS configurado. |
@@ -2093,26 +2094,36 @@ Uma mudanca so deve ser considerada pronta quando:
 
 ### Auditoria existente
 
-O sistema ja registra historico especifico para resultados em
-`match_result_history` e possui campos administrativos em permissoes,
-inscricoes, equipes e partidas.
+O sistema registra historico especifico para resultados em
+`match_result_history` e possui auditoria geral em `audit_logs`.
+
+`audit_logs` registra `actor_id`, `action`, `entity_type`, `entity_id`,
+`tournament_id`, `before_data`, `after_data`, `reason` e `created_at`.
+`ip_address` e `user_agent` existem como campos opcionais, mas permanecem
+nulos ate existir camada server/Edge Function capaz de capturar metadados de
+requisicao com confianca.
+
+Eventos cobertos nesta etapa:
+
+- alteracao de role;
+- decisao de pedidos de criador;
+- concessao e revogacao de permissoes;
+- criacao, edicao e exclusao de torneios;
+- decisao/cancelamento/check-in de inscricoes e alteracao manual de seed;
+- geracao/remocao de chave;
+- registro, correcao, contestacao e resolucao de resultado;
+- criacao, alteracao e remocao de bloqueios administrativos.
 
 ### Auditoria pendente
 
-Para administracao completa, falta um `audit_logs` generico ou equivalente
-para registrar:
+Ainda falta cobrir modulos que nao existem ou continuam parciais:
 
-- alteracao de role;
-- concessao e revogacao de permissoes;
-- edicao de torneio em andamento/finalizado;
-- regeneracao de chave;
-- alteracao manual de seed;
-- bloqueio/desbloqueio de acoes;
-- finalizacao e reabertura de torneios;
-- correcao administrativa de inscricoes/equipes.
-
-Cada log deve registrar `actor_id`, entidade, acao, estado anterior quando
-necessario, estado novo quando necessario, justificativa e timestamp.
+- configuracoes globais;
+- agenda real;
+- grupos e round robin persistidos;
+- W.O. e desclassificacao formal;
+- snapshots oficiais de ranking via RPC;
+- IP e user-agent por camada server.
 
 ### Logs operacionais
 
@@ -2199,12 +2210,20 @@ Arquitetura pendente:
 
 ### Configuracoes globais e bloqueios
 
-Arquitetura pendente:
+Estado atual:
+
+- `action_locks` existe com escopos `global`, `tournament`, `registration`,
+  `team`, `match` e `ranking`;
+- triggers e helpers `is_action_locked()`/`assert_action_unlocked()` validam
+  bloqueios no banco para acoes principais;
+- painel admin permite listar, criar, editar motivo, ativar/desativar e remover
+  bloqueios com auditoria.
+
+Pendente:
 
 - criar `global_settings` para parametros administrativos;
-- criar `action_locks` para bloquear acoes por escopo;
-- validar locks em RPCs e triggers;
-- expor painel admin para consulta e alteracao com justificativa.
+- integrar leitura de bloqueios em todas as telas para mensagens preventivas;
+- criar politicas especificas para configuracoes globais quando a tabela existir.
 
 ## 31. Limites atuais
 

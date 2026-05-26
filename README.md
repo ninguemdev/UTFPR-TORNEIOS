@@ -69,6 +69,11 @@ A pasta `supabase/migrations/` esta reservada para migrations incrementais
 daqui em diante. Veja `supabase/README.md` para o fluxo de schema, migrations,
 seguranca e testes manuais de RLS.
 
+Migration incremental atual:
+
+- `20260526090000_add_audit_logs_action_locks.sql`: cria `audit_logs`,
+  `action_locks`, triggers de auditoria e validacoes de bloqueio no banco.
+
 ## Documentação
 
 - [00 - Visão geral](docs/00-visao-geral.md)
@@ -101,6 +106,7 @@ O MVP deve priorizar:
 - Participantes, equipes e inscrições.
 - Mata-mata simples.
 - Resultados e ranking básico.
+- Auditoria geral e bloqueios administrativos.
 - Pontos corridos.
 - Grupos + playoffs.
 - Disputas e auditoria.

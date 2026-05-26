@@ -83,14 +83,17 @@ O pedido é histórico e não deve ser apagado. A permissão é a fonte de autor
 
 | Campo | Tipo sugerido | Obrigatório | Relações | Observações |
 | --- | --- | --- | --- | --- |
-| id | uuid | Sim | Tournament, AuditLog | Bloqueio administrativo. |
-| scope | enum | Sim | - | global, tournament, match, registration. |
-| tournamentId | uuid | Opcional | Tournament | Torneio afetado quando aplicável. |
-| action | string | Sim | - | Ação bloqueada, como `edit_results`. |
-| locked | boolean | Sim | - | Indica se o bloqueio está ativo. |
+| id | uuid | Sim | AuditLog | Bloqueio administrativo. |
+| scope | enum | Sim | - | `global`, `tournament`, `registration`, `team`, `match`, `ranking`. |
+| scopeId | text | Opcional | - | Obrigatório quando o escopo não é `global`; armazena UUID ou identificador lógico do escopo. |
+| action | string | Sim | - | Ação bloqueada, como `create_tournament`, `register`, `generate_bracket`, `record_result`. |
+| isLocked | boolean | Sim | - | Indica se o bloqueio está ativo. |
 | reason | text | Sim | - | Justificativa obrigatória. |
 | createdBy | uuid | Sim | Profile | Admin responsável. |
 | createdAt | timestamptz | Sim | - | Data de criação. |
+| updatedBy | uuid | Opcional | Profile | Admin que alterou o bloqueio. |
+| updatedAt | timestamptz | Sim | - | Data da última alteração. |
+| expiresAt | timestamptz | Opcional | - | Data opcional de expiração. |
 
 ### Tournament
 
@@ -319,15 +322,18 @@ O pedido é histórico e não deve ser apagado. A permissão é a fonte de autor
 
 | Campo | Tipo sugerido | Obrigatório | Relações | Observações |
 | --- | --- | --- | --- | --- |
-| id | string | Sim | User/Profile | Identificador. |
-| actorId | string | Sim | Profile | Quem executou. |
-| entityType | string | Sim | - | Ex.: MatchResult. |
+| id | uuid | Sim | User/Profile | Identificador. |
+| actorId | uuid | Opcional | Profile | Quem executou, quando há usuário autenticado. |
+| action | string | Sim | - | Ex.: `match_result_corrected`. |
+| entityType | string | Sim | - | Ex.: `match_result`. |
 | entityId | string | Sim | - | Entidade afetada. |
-| action | string | Sim | - | Ex.: result_corrected. |
-| before | object | Opcional | - | Estado anterior. |
-| after | object | Opcional | - | Estado novo. |
+| tournamentId | uuid | Opcional | Tournament | Torneio relacionado quando aplicável. Não usa FK para preservar log de torneio excluído. |
+| beforeData | jsonb | Opcional | - | Estado anterior. |
+| afterData | jsonb | Opcional | - | Estado novo. |
 | reason | text | Opcional | - | Justificativa administrativa quando aplicável. |
-| createdAt | datetime | Sim | - | Data da ação. |
+| ipAddress | inet | Opcional | - | Futuro: depende de camada server/Edge Function para captura confiável. |
+| userAgent | text | Opcional | - | Futuro: depende de camada server/Edge Function para captura confiável. |
+| createdAt | timestamptz | Sim | - | Data da ação. |
 
 ## Regras de integridade
 
@@ -362,6 +368,8 @@ O pedido é histórico e não deve ser apagado. A permissão é a fonte de autor
 - `Match.scheduledAt`.
 - `Standing.stageId + participantId`.
 - `AuditLog.entityType + entityId`.
+- `AuditLog.tournamentId + createdAt`.
+- `ActionLock.action + scope + scopeId`.
 
 ## Status possíveis
 
@@ -384,7 +392,7 @@ O pedido é histórico e não deve ser apagado. A permissão é a fonte de autor
 - `TieBreakerType`: points, wins, draws, losses, score_diff, score_for, head_to_head, buchholz, wo_count.
 - `CreatorRequestStatus`: pending, approved, rejected, cancelled.
 - `CreatorPermissionStatus`: active, revoked.
-- `ActionLockScope`: global, tournament, match, registration.
+- `ActionLockScope`: global, tournament, registration, team, match, ranking.
 
 ## RLS e policies mínimas
 
@@ -399,6 +407,7 @@ Todas as tabelas importantes devem ter RLS habilitado. Policies iniciais recomen
 - `teams` e `team_members`: capitão administra equipe dentro das regras; admin e usuário autorizado do torneio podem revisar.
 - `matches`, `match_results`, `disputes`: leitura pública quando publicada; escrita restrita a participantes envolvidos, usuários autorizados ou admins conforme ação.
 - `audit_logs`: escrita por funções seguras; leitura restrita a admin e usuários autorizados quando necessário.
+- `action_locks`: usuários podem ler bloqueios ativos para entender indisponibilidade; apenas admin cria, altera ou remove bloqueios.
 
 Permissões de escrita sensível devem preferir funções RPC com `security definer` bem revisadas quando a regra for complexa.
 
@@ -599,3 +608,34 @@ RLS:
 - Usuario comum nao manipula ranking manualmente.
 
 No MVP, a tela calcula a classificacao em TypeScript a partir de partidas finalizadas/confirmadas disponiveis. As tabelas de snapshot preparam persistencia e auditoria de rankings oficiais quando pontos corridos/grupos tiverem gerador proprio.
+
+## Atualizacao: auditoria geral e bloqueios administrativos
+
+Implementado no banco:
+
+- `audit_logs` registra acoes sensiveis por triggers e funcoes `security definer`.
+- `action_locks` bloqueia acoes por escopo `global`, `tournament`, `registration`, `team`, `match` e `ranking`.
+- `public.is_action_locked(action, scope, scope_id)` permite consulta segura de bloqueio ativo.
+- `public.assert_action_unlocked(action, scope, scope_id)` e usada por triggers para impedir acoes bloqueadas de usuarios comuns e organizadores.
+
+Auditoria conectada nesta etapa:
+
+- alteracao de role em `profiles`;
+- decisao de pedidos de criador;
+- concessao/revogacao de permissao de criador;
+- criacao, edicao e exclusao de torneios;
+- criacao, decisao, cancelamento e seed de inscricoes;
+- geracao/remocao de chave;
+- registro, correcao, contestacao e resolucao de resultado;
+- criacao, edicao e remocao de bloqueio administrativo.
+
+Bloqueios validados no banco nesta etapa:
+
+- `create_tournament`, `edit_tournament`, `delete_tournament`;
+- `register`, `cancel_registration`, `manage_registration`;
+- `manage_teams`;
+- `generate_bracket`;
+- `record_result`, `contest_result`;
+- `recalculate_ranking`.
+
+`ip_address` e `user_agent` ficam documentados como futuro porque triggers SQL executadas via Supabase/PostgREST nao recebem esses metadados de forma confiavel sem uma camada server/Edge Function.

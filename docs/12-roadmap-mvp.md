@@ -24,9 +24,9 @@
 ## Fase 3 - Permissões, admin e pedidos
 
 - **Objetivo:** controlar criação de torneios e ações administrativas.
-- **Tarefas:** roles `admin` e `user`; pedido para criar torneios; tabela revogável de permissões; aprovação/rejeição por admin; revogação de permissão ativa; configurações globais; bloqueio/desbloqueio de ações; auditoria inicial.
-- **Critérios de aceite:** usuário comum só cria torneio com permissão `active`; admin consegue decidir pedidos e revogar permissões; RLS bloqueia operações indevidas.
-- **Riscos:** confiar apenas na interface; esquecer auditoria em decisões administrativas.
+- **Tarefas:** roles `admin` e `user`; pedido para criar torneios; tabela revogável de permissões; aprovação/rejeição por admin; revogação de permissão ativa; bloqueio/desbloqueio de ações; auditoria geral inicial; configurações globais.
+- **Critérios de aceite:** usuário comum só cria torneio com permissão `active`; admin consegue decidir pedidos, revogar permissões, criar bloqueios e consultar auditoria; RLS bloqueia operações indevidas.
+- **Riscos:** confiar apenas na interface; esquecer auditoria em decisões administrativas; configurações globais ainda precisam de tabela própria.
 
 ## Fase 4 - CRUD de torneios
 
@@ -197,3 +197,20 @@ Limites mantidos:
 - Ainda nao ha `supabase/config.toml`.
 - Tipos em `src/lib/supabase/types.ts` continuam manuais ate a geracao por CLI
   ser adotada.
+
+## Atualizacao: auditoria geral e bloqueios administrativos
+
+Entregue nesta etapa:
+
+- Migration `20260526090000_add_audit_logs_action_locks.sql`.
+- Tabelas `audit_logs` e `action_locks` com RLS.
+- Funcoes `write_audit_log`, `is_action_locked` e `assert_action_unlocked`.
+- Auditoria para permissoes de criador, pedidos, role, torneios, inscricoes, chave, resultados e bloqueios.
+- Bloqueios no banco para criacao/edicao/exclusao de torneio, inscricoes, equipes, geracao de chave, resultado, contestacao e snapshots de ranking.
+- Painel admin com listagem/filtro de auditoria e CRUD operacional de bloqueios.
+
+Limites mantidos:
+
+- `ip_address` e `user_agent` permanecem nulos ate existir camada server/Edge Function que capture metadados de requisicao.
+- `global_settings` ainda nao foi implementado.
+- Auditoria de agenda, grupos e W.O. fica para quando esses modulos existirem.

@@ -4,9 +4,13 @@ Esta pasta esta reservada para migrations versionadas do Supabase.
 
 ## Estado atual
 
-O banco atual ainda usa `../schema.sql` como bootstrap consolidado. Nenhuma
-migration inicial foi duplicada aqui nesta etapa para evitar manter duas fontes
-grandes e divergentes antes da Supabase CLI estar inicializada no projeto.
+O banco atual ainda usa `../schema.sql` como bootstrap consolidado. Mudancas
+incrementais novas tambem devem ser registradas aqui.
+
+Migrations existentes:
+
+- `20260526090000_add_audit_logs_action_locks.sql`: auditoria geral e bloqueios
+  administrativos.
 
 ## Proxima migration
 
@@ -19,7 +23,7 @@ YYYYMMDDHHMMSS_nome_da_mudanca.sql
 Exemplo:
 
 ```text
-20260526090000_create_action_locks.sql
+20260526090100_nome_da_mudanca.sql
 ```
 
 A migration deve incluir, quando aplicavel:

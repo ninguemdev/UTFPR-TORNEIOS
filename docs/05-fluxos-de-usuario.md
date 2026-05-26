@@ -313,3 +313,37 @@ Participante comum nao confirma resultado administrativamente e nao altera parti
 - **Passos:** abrir ranking; acionar recalculo; sistema refaz o calculo a partir dos resultados confirmados.
 - **Erros possiveis:** RLS negando leitura, partidas contestadas ignoradas, formato sem gerador de tabela.
 - **Estado final:** classificacao exibida reflete o estado atual dos resultados confiaveis.
+
+## Atualizacao: auditoria e bloqueios administrativos
+
+### Admin cria bloqueio administrativo
+
+- **Ator:** admin global.
+- **Pre-condicoes:** login admin e motivo definido.
+- **Passos:** abrir `/admin`; preencher escopo, ID do escopo quando necessario, acao, motivo e expiracao opcional; salvar.
+- **Erros possiveis:** escopo sem ID quando nao e global; acao duplicada para o mesmo escopo; RLS negando escrita por usuario nao admin.
+- **Estado final:** `action_locks` registra o bloqueio, `audit_logs` registra `action_lock_created` e a acao passa a ser validada no banco.
+
+### Usuario comum tenta acao bloqueada
+
+- **Ator:** usuario comum ou organizador nao admin.
+- **Pre-condicoes:** bloqueio ativo global ou do escopo da acao.
+- **Passos:** tentar criar torneio, inscrever-se, cancelar inscricao, editar torneio, gerar chave, registrar/contestar resultado, gerenciar equipes ou recalcular ranking.
+- **Erros possiveis:** erro do banco `Acao ... bloqueada por administracao`.
+- **Estado final:** a escrita e negada por trigger/RPC; a UI pode exibir o motivo lendo bloqueios ativos.
+
+### Admin consulta auditoria geral
+
+- **Ator:** admin global.
+- **Pre-condicoes:** eventos sensiveis ja registrados.
+- **Passos:** abrir `/admin`; filtrar por acao, entidade ou torneio.
+- **Erros possiveis:** nenhum evento encontrado; RLS nega leitura para usuario comum.
+- **Estado final:** admin visualiza data, ator, entidade, torneio e motivo sem expor logs ao publico.
+
+### Admin altera bloqueio
+
+- **Ator:** admin global.
+- **Pre-condicoes:** bloqueio existente.
+- **Passos:** editar motivo, ativar/desativar ou remover bloqueio.
+- **Erros possiveis:** RLS negando escrita; tentativa de alterar escopo/acao original; motivo vazio.
+- **Estado final:** bloqueio atualizado/removido e auditoria registra `action_lock_updated` ou `action_lock_deleted`.

@@ -19,7 +19,8 @@ Contratos operacionais atuais:
 - `.env`, `.env.local` e `.env.*.local` nao devem ser versionados.
 - `service_role`, JWT secret e senhas de banco nunca entram no front-end.
 - `supabase/schema.sql` e o bootstrap consolidado para ambiente novo.
-- `supabase/migrations/` deve receber apenas mudancas incrementais futuras.
+- `supabase/migrations/` recebe mudancas incrementais versionadas, incluindo
+  `20260526090000_add_audit_logs_action_locks.sql`.
 - Depois de alterar schema, atualizar tipos em `src/lib/supabase/types.ts` ou
   gerar tipos pela Supabase CLI quando ela estiver configurada.
 
@@ -224,9 +225,9 @@ Fluxo de aplicacao em ambiente novo:
 ## Bloquear ou desbloquear ação
 
 - **Ação:** `setActionLock`
-- **Entrada:** `{ scope, tournamentId?, action, locked, reason }`
+- **Entrada:** `{ scope, scopeId?, action, isLocked, reason, expiresAt? }`
 - **Saída:** `{ actionLock, auditLog }`
-- **Validações:** escopo válido; justificativa obrigatória; admin autenticado.
+- **Validações:** escopo válido; `scopeId` obrigatório quando o escopo não é `global`; justificativa obrigatória; admin autenticado.
 - **Erros possíveis:** `INVALID_SCOPE`, `PERMISSION_DENIED`, `VALIDATION_ERROR`.
 - **Permissões:** admin.
 
@@ -406,3 +407,54 @@ Consultas:
 - **Leitura:** publica para torneios publicados.
 - **Escrita:** apenas admin ou organizador autorizado por `public.can_manage_tournament(tournament_id)`.
 - **Uso esperado:** persistir ranking oficial/provisorio quando houver gerador de pontos corridos ou grupos.
+
+## Atualizacao: contratos de auditoria e bloqueios
+
+### Listar auditoria geral
+
+- **Acao:** `fetchAuditLogs`
+- **Entrada:** `{ action?, entityType?, tournamentId?, limit? }`
+- **Saida:** lista de `audit_logs` ordenada por `created_at desc`.
+- **Validacoes:** filtros opcionais exatos por acao, entidade e torneio.
+- **Erros possiveis:** `PERMISSION_DENIED`, `RLS_DENIED`.
+- **Permissoes:** apenas admin le por RLS. Usuario comum nao recebe logs.
+
+### Listar bloqueios administrativos
+
+- **Acao:** `fetchActionLocks`
+- **Entrada:** `{}`
+- **Saida:** lista de `action_locks`.
+- **Validacoes:** RLS separa leitura publica de bloqueios ativos e leitura completa de admin.
+- **Permissoes:** anonimo/autenticado pode ler bloqueios ativos e nao expirados; admin le todos.
+
+### Criar bloqueio administrativo
+
+- **Acao:** `createActionLock`
+- **Entrada:** `{ scope, scopeId?, action, reason, isLocked, expiresAt? }`
+- **Saida:** `actionLock`.
+- **Validacoes:** admin autenticado; motivo obrigatorio; `scopeId` obrigatorio para escopos nao globais; unico por `scope + scopeId + action`.
+- **Permissoes:** `action_locks_insert_admin` e trigger `validate_action_lock_write`.
+
+### Atualizar bloqueio administrativo
+
+- **Acao:** `updateActionLock`
+- **Entrada:** `{ id, reason?, isLocked?, expiresAt? }`
+- **Saida:** `actionLock`.
+- **Validacoes:** admin autenticado; escopo, acao e autoria original nao podem mudar.
+- **Permissoes:** `action_locks_update_admin` e trigger `validate_action_lock_write`.
+
+### Remover bloqueio administrativo
+
+- **Acao:** `deleteActionLock`
+- **Entrada:** `{ id }`
+- **Saida:** sem payload.
+- **Validacoes:** admin autenticado.
+- **Permissoes:** `action_locks_delete_admin`.
+
+### Validacao de bloqueios no banco
+
+- `public.is_action_locked(action, scope, scope_id)` retorna bloqueio ativo considerando tambem bloqueio global da mesma acao.
+- `public.assert_action_unlocked(action, scope, scope_id)` interrompe a operacao com erro quando usuario comum ou organizador tenta acao bloqueada.
+- Admin global pode operar apesar do bloqueio para conseguir corrigir ou remover a trava.
+
+Acoes cobertas por triggers/RPCs nesta etapa: `create_tournament`, `edit_tournament`, `delete_tournament`, `register`, `cancel_registration`, `manage_registration`, `manage_teams`, `generate_bracket`, `record_result`, `contest_result` e `recalculate_ranking`.

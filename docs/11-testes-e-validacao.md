@@ -108,8 +108,8 @@ Antes de continuar funcionalidades grandes, validar:
 
 Como Supabase ja esta integrado, criar testes ou validações manuais com usuários diferentes:
 
-- RLS habilitado nas tabelas atuais: `profiles`, `tournament_creator_requests`, `tournament_creator_permissions`, `tournaments`, `tournament_registrations`, `teams`, `team_members`, `tournament_brackets`, `bracket_matches`, `match_results`, `match_result_history`, `tournament_standings` e `standing_entries`.
-- Tabelas futuras como `audit_logs`, `global_settings`, `action_locks`, grupos e agenda tambem devem nascer com RLS.
+- RLS habilitado nas tabelas atuais: `profiles`, `tournament_creator_requests`, `tournament_creator_permissions`, `tournaments`, `tournament_registrations`, `teams`, `team_members`, `tournament_brackets`, `bracket_matches`, `match_results`, `match_result_history`, `tournament_standings`, `standing_entries`, `audit_logs` e `action_locks`.
+- Tabelas futuras como `global_settings`, grupos e agenda tambem devem nascer com RLS.
 - Usuário A não lê dados privados do usuário B.
 - Usuário A não atualiza perfil do usuário B.
 - Usuário comum não altera `profiles.role`.
@@ -122,6 +122,14 @@ Como Supabase ja esta integrado, criar testes ou validações manuais com usuár
 - Admin consegue alterar torneio em andamento/encerrado com auditoria.
 - Escrita direta no banco sem permissão é negada por policy, mesmo que a interface esconda o botão.
 - RPCs sensíveis registram `AuditLog` na mesma transação.
+- Usuário comum não lê `audit_logs`.
+- Usuário comum não cria, edita nem remove `action_locks`.
+- Usuário comum consegue ler bloqueios ativos e não expirados para explicar ação indisponível.
+- Bloqueio `create_tournament` impede criação por usuário autorizado não admin.
+- Bloqueio `register` impede inscrição direta mesmo se a interface tentar enviar a chamada.
+- Bloqueio `generate_bracket` impede geração/regeneração por organizador não admin.
+- Bloqueio `record_result` impede registro/correção de resultado por organizador não admin.
+- Bloqueio `contest_result` impede contestação por participante.
 
 ## Testes de formulário
 
@@ -131,6 +139,16 @@ Como Supabase ja esta integrado, criar testes ou validações manuais com usuár
 - Nome de equipe vazio.
 - Membros duplicados.
 - Mensagens de erro acessíveis.
+
+## Testes manuais de auditoria e bloqueios
+
+1. Admin cria um bloqueio `register` global em `/admin`; verificar linha em `action_locks` e evento `action_lock_created` em `audit_logs`.
+2. Usuário comum tenta se inscrever em torneio aberto; o banco deve retornar erro de ação bloqueada e não criar inscrição.
+3. Admin desativa o bloqueio; verificar evento `action_lock_updated` e repetir inscrição.
+4. Usuário comum tenta inserir ou atualizar `action_locks` via cliente; RLS deve negar.
+5. Usuário comum tenta consultar `audit_logs`; RLS deve negar ou retornar vazio conforme cliente.
+6. Admin aprova/rejeita pedido de criador; verificar eventos `creator_request_*` e `creator_permission_granted`.
+7. Organizador gera chave e registra resultado; verificar `bracket_generated` e `match_result_recorded`.
 
 ## Testes de responsividade
 

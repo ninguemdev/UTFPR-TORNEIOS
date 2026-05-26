@@ -10,6 +10,12 @@ por migrations versionadas.
 - `migrations/`: pasta reservada para migrations incrementais daqui para
   frente.
 
+Migration incremental atual:
+
+- `migrations/20260526090000_add_audit_logs_action_locks.sql`: adiciona
+  `audit_logs`, `action_locks`, RLS, triggers de auditoria e validacao de
+  bloqueios administrativos.
+
 ## Variaveis de ambiente
 
 O front-end usa somente variaveis publicas do Vite:
@@ -88,6 +94,9 @@ Valide pelo painel Supabase, SQL Editor e pela aplicacao com contas diferentes:
 7. Admin revisa pedidos, revoga permissoes e gerencia qualquer torneio.
 8. Escrita direta em tabelas sensiveis falha quando deveria passar apenas por RPC.
 9. RPCs sensiveis validam permissao no banco, nao apenas na interface.
+10. Usuario comum nao le `audit_logs` nem escreve `action_locks`.
+11. Bloqueios ativos impedem a acao correspondente no banco para usuario comum
+    e organizador nao admin.
 
 ## Regras de seguranca
 

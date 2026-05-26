@@ -1,5 +1,13 @@
 export type UserRole = 'admin' | 'user'
 
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
 export type AvatarKey =
   | 'avatar_utfpr_blue'
   | 'avatar_utfpr_green'
@@ -60,6 +68,14 @@ export type MatchResultStatus =
   | 'disputed'
   | 'resolved'
   | 'cancelled'
+
+export type ActionLockScope =
+  | 'global'
+  | 'tournament'
+  | 'registration'
+  | 'team'
+  | 'match'
+  | 'ranking'
 
 export type Profile = {
   id: string
@@ -257,6 +273,35 @@ export type StandingEntry = {
   is_technical_tie: boolean
   created_at: string
   updated_at: string
+}
+
+export type AuditLog = {
+  id: string
+  actor_id: string | null
+  action: string
+  entity_type: string
+  entity_id: string
+  tournament_id: string | null
+  before_data: Json | null
+  after_data: Json | null
+  reason: string | null
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+}
+
+export type ActionLock = {
+  id: string
+  scope: ActionLockScope
+  scope_id: string | null
+  action: string
+  is_locked: boolean
+  reason: string
+  created_by: string
+  created_at: string
+  updated_by: string | null
+  updated_at: string
+  expires_at: string | null
 }
 
 export type Team = {
@@ -663,6 +708,30 @@ export type Database = {
         >
         Relationships: []
       }
+      audit_logs: {
+        Row: AuditLog
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      action_locks: {
+        Row: ActionLock
+        Insert: Pick<ActionLock, 'scope' | 'action' | 'reason'> &
+          Partial<
+            Pick<
+              ActionLock,
+              | 'scope_id'
+              | 'is_locked'
+              | 'created_by'
+              | 'updated_by'
+              | 'expires_at'
+            >
+          >
+        Update: Partial<
+          Pick<ActionLock, 'is_locked' | 'reason' | 'updated_by' | 'expires_at'>
+        >
+        Relationships: []
+      }
       teams: {
         Row: Team
         Insert: Pick<Team, 'tournament_id' | 'name' | 'captain_id' | 'created_by'> &
@@ -744,6 +813,14 @@ export type Database = {
         Args: Record<string, never>
         Returns: boolean
       }
+      is_action_locked: {
+        Args: {
+          target_action: string
+          target_scope?: ActionLockScope
+          target_scope_id?: string | null
+        }
+        Returns: boolean
+      }
       is_match_participant: {
         Args: {
           target_match_id: string
@@ -789,6 +866,7 @@ export type Database = {
       team_status: TeamStatus
       team_member_role: TeamMemberRole
       team_member_status: TeamMemberStatus
+      action_lock_scope: ActionLockScope
     }
     CompositeTypes: Record<string, never>
   }
