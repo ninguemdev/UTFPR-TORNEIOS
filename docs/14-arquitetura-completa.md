@@ -2459,3 +2459,22 @@ rolagem agressiva em mobile ao empilhar rodadas e usa colunas apenas em desktop.
 - `docs/10-css-responsividade-acessibilidade.md`
 - `docs/13-checklist-code-review.md`
 - `docs/14-arquitetura-completa.md`
+
+## Atualizacao: arquitetura de fluxos
+
+A arquitetura operacional agora esta detalhada em `docs/fluxos/`.
+
+Principais conclusoes:
+
+- O nucleo implementado cobre Auth, profiles, pedidos/permissoes de criador, torneios, inscricoes, equipes, check-in, W.O., desclassificacao, mata-mata simples, resultados, contestacoes, historico, auditoria e bloqueios.
+- O nucleo parcial cobre ranking, snapshots de classificacao, formatos de tabela, grupos, grupos + playoffs, agentes livres e comunicacao preventiva de bloqueios.
+- O nucleo pendente cobre agenda real de partidas, geradores persistidos de pontos corridos/grupos, notificacoes, `global_settings` e testes automatizados de RLS.
+
+Referencias principais:
+
+- `docs/fluxos/00-indice-fluxos.md`
+- `docs/fluxos/01-atores-e-permissoes.md`
+- `docs/fluxos/02-mapa-geral-do-sistema.md`
+- `docs/fluxos/17-casos-de-erro-e-falhas-de-fluxo.md`
+- `docs/fluxos/18-matriz-de-casos-de-uso.md`
+- `docs/fluxos/20-pendencias-e-recomendacoes.md`

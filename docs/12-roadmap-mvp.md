@@ -214,3 +214,17 @@ Limites mantidos:
 - `ip_address` e `user_agent` permanecem nulos ate existir camada server/Edge Function que capture metadados de requisicao.
 - `global_settings` ainda nao foi implementado.
 - Auditoria de agenda e grupos fica para quando esses modulos existirem; W.O. manual ja entra em `match_results`, `match_result_history` e `audit_logs`.
+
+## Atualizacao: roadmap orientado por fluxos
+
+O roadmap de pendencias por prioridade esta consolidado em `docs/fluxos/20-pendencias-e-recomendacoes.md`.
+
+Itens que devem ficar acima de novas funcionalidades cosmeticas:
+
+- Proteger regeracao de chave quando houver resultados.
+- Criar testes automatizados de RLS/RPCs/triggers.
+- Implementar ou ocultar claramente pontos corridos, grupos e grupos + playoffs.
+- Definir agenda de partidas com modelo persistido.
+- Definir reversao auditada ou irreversibilidade de W.O. e desclassificacao.
+- Alinhar permissao de contestacao para membros de equipe.
+- Criar avisos preventivos de action locks.

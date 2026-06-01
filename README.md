@@ -91,6 +91,13 @@ Migration incremental atual:
 - [12 - Roadmap MVP](docs/12-roadmap-mvp.md)
 - [13 - Checklist de code review](docs/13-checklist-code-review.md)
 - [14 - Arquitetura completa](docs/14-arquitetura-completa.md)
+- [Fluxos completos e casos de uso](docs/fluxos/00-indice-fluxos.md)
+
+## Documentacao de fluxos e casos de uso
+
+A pasta [`docs/fluxos`](docs/fluxos/00-indice-fluxos.md) contem o mapa completo dos fluxos operacionais do sistema: atores, permissoes, pre-condicoes, caminhos felizes, fluxos alternativos, erros, regras de seguranca, dados lidos/escritos, telas, services, componentes, fluxogramas Mermaid, matriz de casos de uso, falhas conhecidas, checklist de validacao e pendencias por prioridade.
+
+Use esses documentos antes de abrir novas tarefas de implementacao: eles indicam o que esta implementado, parcial, pendente, futuro, inconsistente ou precisa revisao.
 
 ## Escopo inicial
 

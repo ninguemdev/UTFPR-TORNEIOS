@@ -128,3 +128,13 @@ A tela continua mobile-first: a chave aparece como lista por rodada em telas peq
 - **Regras:** a home nao possui botao de voltar; esta tela usa o layout global com header e botao "Voltar".
 - **Navegacao:** `/torneios` e `/torneios/:id` exibem link para "Ranking".
 - **Limitacao:** `single_elimination` mostra aviso de que ranking completo de mata-mata fica para etapa futura.
+
+## Atualizacao: rotas reais, planejadas e fluxos detalhados
+
+O mapa operacional completo das telas esta em `docs/fluxos/02-mapa-geral-do-sistema.md`. Ele diferencia rotas reais do hash router em `src/App.tsx`, rotas planejadas em documentos antigos e rotas demo legadas que ainda nao representam modulos Supabase completos.
+
+Para validar uma tela antes de implementar ou testar, use tambem:
+
+- `docs/fluxos/18-matriz-de-casos-de-uso.md`
+- `docs/fluxos/19-checklist-de-validacao-de-fluxos.md`
+- `docs/fluxos/17-casos-de-erro-e-falhas-de-fluxo.md`

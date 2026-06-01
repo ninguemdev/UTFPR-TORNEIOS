@@ -497,3 +497,14 @@ Acoes cobertas por triggers/RPCs nesta etapa: `create_tournament`, `edit_tournam
 - **Saida:** sem payload.
 - **Validacoes:** admin/organizador, vencedor pertence a partida, justificativa obrigatoria, action lock `record_result`.
 - **Efeitos:** cria/atualiza `match_results` com `result_type = walkover`, marca perdedor com `no_show_at`, grava historico e avanca vencedor.
+
+## Atualizacao: contratos por fluxo
+
+Os contratos acima foram cruzados com os fluxos reais em `docs/fluxos/`. Para cada implementacao nova, consulte:
+
+- `docs/fluxos/18-matriz-de-casos-de-uso.md` para ID, ator, status e evidencia.
+- `docs/fluxos/17-casos-de-erro-e-falhas-de-fluxo.md` para inconsistencias entre contrato, schema e UI.
+- `docs/fluxos/15-auditoria-bloqueios-e-seguranca.md` para RLS, RPCs, triggers, action locks e auditoria.
+- `docs/fluxos/20-pendencias-e-recomendacoes.md` para contratos pendentes ou parciais.
+
+Contratos marcados como planejados, como `updateGlobalSettings`, grupos reais, agenda de partidas e notificacoes, nao devem ser tratados como implementados ate existirem schema, service, tela e validacao.

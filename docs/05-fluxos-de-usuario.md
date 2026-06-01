@@ -381,3 +381,17 @@ Participante comum nao confirma resultado administrativamente e nao altera parti
 - **Passos:** informar justificativa na tela de participantes e confirmar desclassificacao.
 - **Erros possiveis:** justificativa curta, usuario comum tentando executar, bloqueio administrativo.
 - **Estado final:** inscricao recebe `disqualified_at`/`disqualification_reason`, sai de novas chaves e aparece com badge claro.
+
+## Atualizacao: documentacao completa de fluxos
+
+Os fluxos detalhados agora estao consolidados em `docs/fluxos/`, com estrutura padronizada por fluxo, fluxogramas Mermaid, matriz de casos de uso, falhas conhecidas, checklist de validacao e pendencias por prioridade.
+
+Leitura recomendada:
+
+- `docs/fluxos/00-indice-fluxos.md` para navegacao geral.
+- `docs/fluxos/18-matriz-de-casos-de-uso.md` para transformar casos em tarefas ou testes.
+- `docs/fluxos/17-casos-de-erro-e-falhas-de-fluxo.md` para priorizar correcoes.
+- `docs/fluxos/19-checklist-de-validacao-de-fluxos.md` para QA manual e automatizado.
+- `docs/fluxos/20-pendencias-e-recomendacoes.md` para roadmap tecnico.
+
+Este arquivo permanece como resumo historico. Para novas implementacoes, use os documentos em `docs/fluxos/` como fonte principal.

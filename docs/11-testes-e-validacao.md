@@ -373,3 +373,17 @@ Validacao manual pela UI:
 - Participante da partida contesta W.O.; resultado fica `disputed` e admin/organizador resolve mantendo ou cancelando.
 - Admin/organizador desclassifica participante com justificativa; verificar badge `Desclassificada`, auditoria e exclusao da geracao de chave.
 - Usuario comum tenta chamar `disqualify_registration`, `set_registration_check_in` ou escrever campos administrativos direto; RLS/RPC deve negar.
+
+## Atualizacao: checklist consolidado de fluxos
+
+O checklist completo por papel e area esta em `docs/fluxos/19-checklist-de-validacao-de-fluxos.md`.
+
+Prioridades de teste novas:
+
+- RLS por papel: anonimo, usuario comum, criador autorizado, criador revogado, capitao, membro, organizador e admin.
+- RPCs criticas: check-in, W.O., desclassificacao, resultado, contestacao e resolucao.
+- Regeracao de chave com resultados existentes.
+- Divergencias entre permissao do banco e botoes visiveis no front-end.
+- Formatos parciais: ranking, pontos corridos, grupos, grupos + playoffs e agenda.
+
+Use `docs/fluxos/17-casos-de-erro-e-falhas-de-fluxo.md` como backlog de cenarios negativos.
