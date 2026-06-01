@@ -18,6 +18,8 @@ export type RankingMatch = {
   scoreB: number | null
   status: string
   resultStatus?: string | null
+  resultType?: string | null
+  winnerRegistrationId?: string | null
   groupId?: string | null
 }
 
@@ -64,7 +66,7 @@ export const DEFAULT_RANKING_CRITERIA = [
 ]
 
 const DEFAULT_TIE_BREAKER_SUMMARY =
-  'Criterios: pontos, vitorias, saldo, score pro, confronto direto quando aplicavel e fallback por seed/nome.'
+  'Criterios: pontos, vitorias, saldo, score pro, confronto direto quando aplicavel e fallback por seed/nome. W.O. conta como vitoria/derrota sem saldo de score.'
 
 type MutableRankingStats = Omit<
   RankingEntry,
@@ -77,6 +79,12 @@ export function isRankingMatchCountable(match: RankingMatch) {
     return false
   }
   if (!match.participantAId || !match.participantBId) return false
+  if (match.resultType === 'walkover') {
+    return (
+      match.winnerRegistrationId === match.participantAId ||
+      match.winnerRegistrationId === match.participantBId
+    )
+  }
   if (match.scoreA === null || match.scoreB === null) return false
   if (!Number.isFinite(match.scoreA) || !Number.isFinite(match.scoreB)) return false
   if (match.scoreA < 0 || match.scoreB < 0) return false
@@ -122,7 +130,23 @@ export function calculateRanking(params: {
     const participantA = statsByParticipant.get(match.participantAId!)
     const participantB = statsByParticipant.get(match.participantBId!)
 
-    if (!participantA || !participantB || match.scoreA === null || match.scoreB === null) {
+    if (!participantA || !participantB) {
+      continue
+    }
+
+    if (match.resultType === 'walkover') {
+      applyWalkoverStats(
+        participantA,
+        participantB,
+        match.winnerRegistrationId,
+        match.participantAId!,
+        match.participantBId!,
+        scoring,
+      )
+      continue
+    }
+
+    if (match.scoreA === null || match.scoreB === null) {
       continue
     }
 
@@ -203,6 +227,33 @@ function applyMatchStats(
   entry.points += scoring.drawPoints
 }
 
+function applyWalkoverStats(
+  participantA: MutableRankingStats,
+  participantB: MutableRankingStats,
+  winnerRegistrationId: string | null | undefined,
+  participantAId: string,
+  participantBId: string,
+  scoring: RankingScoringConfig,
+) {
+  participantA.played += 1
+  participantB.played += 1
+
+  if (winnerRegistrationId === participantAId) {
+    participantA.wins += 1
+    participantA.points += scoring.winPoints
+    participantB.losses += 1
+    participantB.points += scoring.lossPoints
+    return
+  }
+
+  if (winnerRegistrationId === participantBId) {
+    participantB.wins += 1
+    participantB.points += scoring.winPoints
+    participantA.losses += 1
+    participantA.points += scoring.lossPoints
+  }
+}
+
 function compareMainCriteria(first: RankingEntry, second: RankingEntry) {
   return (
     second.points - first.points ||
@@ -224,14 +275,23 @@ function compareHeadToHead(firstId: string, secondId: string, matches: RankingMa
   const second: MutableRankingStats = createEmptyStats(secondId)
 
   for (const match of directMatches) {
-    if (!isRankingMatchCountable(match) || match.scoreA === null || match.scoreB === null) {
+    if (!isRankingMatchCountable(match)) {
       continue
     }
 
-    if (match.participantAId === firstId) {
+    if (match.resultType === 'walkover') {
+      applyWalkoverStats(
+        first,
+        second,
+        match.winnerRegistrationId,
+        firstId,
+        secondId,
+        DEFAULT_RANKING_SCORING,
+      )
+    } else if (match.scoreA !== null && match.scoreB !== null && match.participantAId === firstId) {
       applyMatchStats(first, match.scoreA, match.scoreB, DEFAULT_RANKING_SCORING)
       applyMatchStats(second, match.scoreB, match.scoreA, DEFAULT_RANKING_SCORING)
-    } else {
+    } else if (match.scoreA !== null && match.scoreB !== null) {
       applyMatchStats(first, match.scoreB, match.scoreA, DEFAULT_RANKING_SCORING)
       applyMatchStats(second, match.scoreA, match.scoreB, DEFAULT_RANKING_SCORING)
     }

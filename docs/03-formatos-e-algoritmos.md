@@ -318,7 +318,7 @@ O MVP implementa validacao de resultado para `single_elimination` em camada sepa
 - `isDrawAllowed` prepara expansao futura para formatos que aceitam empate.
 - O banco repete as validacoes sensiveis nas RPCs `record_bracket_match_result`, `contest_match_result` e `resolve_match_dispute`.
 
-Formatos como melhor de 3/5/7, pontos corridos, grupos e W.O. permanecem fora do escopo desta etapa, mas a assinatura da validacao ja separa `format` da regra aplicada.
+Formatos como melhor de 3/5/7, pontos corridos e grupos completos permanecem fora do escopo desta etapa. W.O. ja existe como `result_type = walkover`, separado do placar comum.
 
 ## Atualizacao: algoritmo de ranking
 
@@ -346,3 +346,30 @@ func calcularRanking(participantes, partidas, pontuacao):
 ```
 
 Confronto direto e aplicado apenas quando a comparacao envolve exatamente dois participantes empatados. Em empate multiplo, o MVP mantem empate tecnico e usa seed/nome somente como fallback visual estavel, sem declarar vantagem esportiva.
+
+## Atualizacao: check-in e W.O.
+
+A geracao de mata-mata agora filtra participantes elegiveis:
+
+```text
+func filtrarElegiveis(torneio, inscricoes):
+  confirmados = status em [confirmed, checked_in, registered]
+  semPunicao = disqualified_at nulo e no_show_at nulo
+  se torneio.requires_check_in:
+    retornar confirmados com checked_in_at preenchido e semPunicao
+  retornar confirmados semPunicao
+```
+
+W.O. e tratado como tipo de resultado:
+
+```text
+func registrarWO(partida, vencedor, justificativa):
+  validar vencedor pertence a partida
+  validar justificativa obrigatoria
+  marcar resultado como result_type = walkover
+  marcar perdedor como no_show
+  avancar vencedor na chave
+  registrar historico/auditoria
+```
+
+No ranking, W.O. soma jogo, vitoria e derrota conforme a pontuacao padrao. Nao soma `score_for`, `score_against` nem `score_diff`, porque nao representa placar esportivo.

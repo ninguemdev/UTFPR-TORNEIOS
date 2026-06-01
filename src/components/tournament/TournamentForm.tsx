@@ -55,6 +55,7 @@ export function TournamentForm({
     const allowFreeAgents = formData.get('allow_free_agents') === 'on'
     const requireFullTeamBeforeRegistration =
       formData.get('require_full_team_before_registration') === 'on'
+    const requiresCheckIn = formData.get('requires_check_in') === 'on'
 
     if (name.length < 4) {
       setLocalError('Informe um nome com pelo menos 4 caracteres.')
@@ -97,6 +98,9 @@ export function TournamentForm({
         registrationType === 'team'
           ? readNullableText(formData.get('team_registration_deadline'))
           : null,
+      requires_check_in: requiresCheckIn,
+      check_in_opens_at: readNullableText(formData.get('check_in_opens_at')),
+      check_in_closes_at: readNullableText(formData.get('check_in_closes_at')),
       campus: readNullableText(formData.get('campus')),
       description: readNullableText(formData.get('description')),
       starts_at: readNullableText(formData.get('starts_at')),
@@ -259,6 +263,48 @@ export function TournamentForm({
             defaultValue={initialTournament?.team_registration_deadline?.slice(0, 16) ?? ''}
           />
         </label>
+      </section>
+
+      <section className="form-section" aria-labelledby="tournament-check-in-data">
+        <div className="section-heading">
+          <h2 id="tournament-check-in-data">Check-in</h2>
+          <p>
+            Configure se a chave deve considerar apenas participantes com presenca
+            confirmada. A janela tambem pode ser ajustada na tela de participantes.
+          </p>
+        </div>
+
+        <label className="field checkbox-field" htmlFor="tournament-requires-check-in">
+          <input
+            id="tournament-requires-check-in"
+            name="requires_check_in"
+            type="checkbox"
+            defaultChecked={initialTournament?.requires_check_in ?? false}
+          />
+          <span>Exigir check-in antes de gerar chave</span>
+        </label>
+
+        <div className="form-grid">
+          <label className="field" htmlFor="tournament-check-in-opens-at">
+            <span>Abertura do check-in</span>
+            <input
+              id="tournament-check-in-opens-at"
+              name="check_in_opens_at"
+              type="datetime-local"
+              defaultValue={initialTournament?.check_in_opens_at?.slice(0, 16) ?? ''}
+            />
+          </label>
+
+          <label className="field" htmlFor="tournament-check-in-closes-at">
+            <span>Fechamento do check-in</span>
+            <input
+              id="tournament-check-in-closes-at"
+              name="check_in_closes_at"
+              type="datetime-local"
+              defaultValue={initialTournament?.check_in_closes_at?.slice(0, 16) ?? ''}
+            />
+          </label>
+        </div>
       </section>
 
       <section className="form-section" aria-labelledby="tournament-rules-data">

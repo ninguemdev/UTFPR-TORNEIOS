@@ -220,3 +220,14 @@ As regras devem reduzir incentivos para perder de propósito, manipular saldo ou
 - A ordem padrao de desempate e: pontos, vitorias, saldo, score pro, confronto direto quando houver exatamente dois participantes empatados e fallback estavel por seed/nome.
 - O fallback por seed/nome nao resolve o empate esportivo; ele apenas estabiliza a exibicao. A interface deve indicar empate tecnico quando os criterios principais continuarem iguais.
 - No MVP, mata-mata simples nao e convertido em ranking completo. Campeao/finalistas podem virar ranking proprio em etapa futura.
+
+## Atualizacao: check-in, W.O. e desclassificacao
+
+- Check-in formal e controlado por janela no torneio. Sem `check_in_opens_at`, a janela e considerada fechada para o participante.
+- Usuario inscrito so pode fazer check-in da propria inscricao confirmada durante a janela aberta.
+- Admin/organizador pode marcar check-in manualmente e desfazer check-in com justificativa registrada em `check_in_notes`.
+- Quando `requires_check_in = true`, apenas participantes com `checked_in_at` entram na geracao de chave.
+- W.O. nao e placar comum: o resultado usa `result_type = walkover`, vencedor obrigatorio e justificativa administrativa obrigatoria.
+- W.O. conta para ranking como vitoria/derrota sem adicionar saldo de score.
+- Participante pode contestar W.O. como qualquer resultado finalizado da propria partida.
+- Desclassificacao exige justificativa, gera auditoria e remove o participante da elegibilidade de novas chaves. Se ele ja estiver em uma chave, o fluxo recomendado e registrar W.O. para o adversario ou bloquear a acao via `action_locks` ate resolucao manual.

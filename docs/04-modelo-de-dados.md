@@ -639,3 +639,33 @@ Bloqueios validados no banco nesta etapa:
 - `recalculate_ranking`.
 
 `ip_address` e `user_agent` ficam documentados como futuro porque triggers SQL executadas via Supabase/PostgREST nao recebem esses metadados de forma confiavel sem uma camada server/Edge Function.
+
+## Atualizacao: check-in, W.O. e desclassificacao
+
+### `tournaments`
+
+Novos campos:
+
+- `requires_check_in`: booleano que obriga check-in antes da geracao de chave.
+- `check_in_opens_at`: inicio da janela formal de check-in.
+- `check_in_closes_at`: fim opcional da janela.
+
+### `tournament_registrations`
+
+Novos campos operacionais:
+
+- `checked_in_at`, `checked_in_by`, `check_in_notes`: confirmacao de presenca.
+- `check_in_revoked_by`, `check_in_revoked_at`: auditoria operacional ao desfazer check-in.
+- `disqualified_at`, `disqualified_by`, `disqualification_reason`: desclassificacao administrativa.
+- `no_show_at`, `no_show_by`, `no_show_reason`: participante/equipe que recebeu W.O.
+
+`no_show` e `disqualified` sao estados derivados desses campos, nao novos valores do enum. Isso evita migracoes arriscadas de enum e preserva compatibilidade com `pending`, `confirmed`, `checked_in`, `cancelled`, `rejected` e `registered`.
+
+### `match_results` e `bracket_matches`
+
+Novos campos:
+
+- `result_type`: `score` ou `walkover`.
+- `walkover_reason`, `walkover_by`, `walkover_at`: justificativa e autoria de W.O.
+
+`match_result_history` recebeu `previous_result_type` e `new_result_type` para registrar mudancas entre placar comum e W.O.

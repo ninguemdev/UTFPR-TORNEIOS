@@ -115,3 +115,16 @@ O arquivo `code_review.md` ainda não está presente no repositório. Este check
 - Paginas principais usam `AuthenticatedShell`/`SiteHeader`, sem header duplicado por tela.
 - Paginas internas exibem botao "Voltar"; home nao exibe.
 - Paginas de login/cadastro mantem caminho claro para home.
+
+## Atualizacao: identidade visual UTFPR
+
+- Tokens globais de `src/index.css` usam grafite/preto e amarelo UTFPR como base.
+- `button-primary` usa amarelo com texto grafite e deve aparecer apenas para CTA principal.
+- Header, hero, auth e public cover carregam a identidade institucional sem deixar a UI escura demais.
+- Cards usam superficie clara, borda neutra, sombra leve e detalhe amarelo sutil.
+- Badges usam texto explicito e ponto visual; status nao depende apenas de cor.
+- Tabelas usam `.table-scroll`, cabecalho claro, zebra sutil e siglas explicadas.
+- Chave mata-mata funciona como lista em mobile e colunas em desktop; vencedor, bye, W.O. e contestacao precisam de texto.
+- Formularios mantem labels visiveis, foco acessivel e area minima de toque.
+- Nao ha `!important`, Tailwind, styled-components ou biblioteca visual adicionada.
+- Conferir visualmente 320px, 480px, 768px, 1024px e desktop amplo antes de aprovar mudancas de UI.

@@ -12,17 +12,20 @@ import type {
 import {
   validateContestReason,
   validateMatchResult,
+  validateWalkoverResult,
 } from '../../lib/tournaments/matchResults'
 import {
   bracketMatchStatusLabels,
   bracketSeedingMethodLabels,
   completeBracketMatch,
+  completeBracketMatchByWalkover,
   contestMatchResult,
   fetchBracketParticipants,
   fetchMatchResultHistory,
   fetchTournamentBracket,
   generateTournamentBracket,
   matchResultStatusLabels,
+  matchResultTypeLabels,
   resolveMatchDispute,
   type TournamentBracketWithMatches,
 } from '../../services/brackets'
@@ -39,6 +42,8 @@ type ResultForm = {
   changeReason: string
   contestReason: string
   resolutionNotes: string
+  walkoverWinnerId: string
+  walkoverReason: string
 }
 
 type ResultFormByMatch = Record<string, ResultForm>
@@ -75,6 +80,8 @@ function getEmptyResultForm(): ResultForm {
     changeReason: '',
     contestReason: '',
     resolutionNotes: '',
+    walkoverWinnerId: '',
+    walkoverReason: '',
   }
 }
 
@@ -258,6 +265,49 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
     }
   }
 
+  async function handleWalkover(match: BracketMatch) {
+    const form = resultFormsByMatch[match.id] ?? getEmptyResultForm()
+    const winnerRegistrationId = form.walkoverWinnerId || null
+    const validation = validateWalkoverResult({
+      status: match.status,
+      isBye: match.is_bye,
+      participantAId: match.participant_a_registration_id,
+      participantBId: match.participant_b_registration_id,
+      winnerRegistrationId,
+      reason: form.walkoverReason,
+      isCorrection: ['completed', 'disputed'].includes(match.status),
+    })
+
+    if (!validation.valid || !winnerRegistrationId) {
+      setError(validation.errors[0] ?? 'W.O. invalido.')
+      return
+    }
+
+    if (!window.confirm('Registrar W.O. com a justificativa informada?')) return
+
+    setIsSubmitting(`${match.id}:walkover`)
+    setError('')
+    setSuccess('')
+
+    try {
+      await completeBracketMatchByWalkover({
+        matchId: match.id,
+        winnerRegistrationId,
+        reason: form.walkoverReason.trim(),
+      })
+      await loadBracket()
+      setSuccess('W.O. registrado e vencedor avancado.')
+    } catch (walkoverError) {
+      setError(
+        walkoverError instanceof Error
+          ? walkoverError.message
+          : 'Nao foi possivel registrar W.O.',
+      )
+    } finally {
+      setIsSubmitting('')
+    }
+  }
+
   async function handleContestMatch(match: BracketMatch) {
     const form = resultFormsByMatch[match.id] ?? getEmptyResultForm()
     const reasonError = validateContestReason(form.contestReason)
@@ -405,7 +455,8 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
           <div className="section-heading">
             <h2>Configuracao</h2>
             <p>
-              {eligibleCount} participante(s) confirmado(s) entram na geracao.
+              {eligibleCount} participante(s) elegivel(is) entram na geracao.
+              {tournament.requires_check_in ? ' Check-in obrigatorio ativo.' : ''}
               O sorteio e salvo no banco apenas no momento da geracao.
             </p>
           </div>
@@ -513,13 +564,17 @@ export function TournamentBracketPage({ tournamentId }: { tournamentId: string }
                           bracketData.participantsById,
                           user?.id,
                         )}
-                        isSubmitting={isSubmitting === match.id}
+                        isSubmitting={
+                          isSubmitting === match.id || isSubmitting === `${match.id}:walkover`
+                        }
+                        isWalkoverSubmitting={isSubmitting === `${match.id}:walkover`}
                         isContestSubmitting={isSubmitting === `${match.id}:contest`}
                         isHistoryLoading={isSubmitting === `${match.id}:history`}
                         isResolving={isSubmitting.startsWith(`${match.id}:resolve`)}
                         form={resultFormsByMatch[match.id] ?? getEmptyResultForm()}
                         onFormChange={(field, value) => updateMatchForm(match.id, field, value)}
                         onComplete={() => void handleCompleteMatch(match)}
+                        onWalkover={() => void handleWalkover(match)}
                         onContest={() => void handleContestMatch(match)}
                         onResolve={(action) => void handleResolveDispute(match, action)}
                         onToggleHistory={() => void handleLoadHistory(match.id)}
@@ -544,12 +599,14 @@ function BracketMatchCard({
   canManage,
   canContest,
   isSubmitting,
+  isWalkoverSubmitting,
   isContestSubmitting,
   isHistoryLoading,
   isResolving,
   form,
   onFormChange,
   onComplete,
+  onWalkover,
   onContest,
   onResolve,
   onToggleHistory,
@@ -561,12 +618,14 @@ function BracketMatchCard({
   canManage: boolean
   canContest: boolean
   isSubmitting: boolean
+  isWalkoverSubmitting: boolean
   isContestSubmitting: boolean
   isHistoryLoading: boolean
   isResolving: boolean
   form: ResultForm
   onFormChange: (field: keyof ResultForm, value: string) => void
   onComplete: () => void
+  onWalkover: () => void
   onContest: () => void
   onResolve: (action: 'confirm' | 'cancel') => void
   onToggleHistory: () => void
@@ -588,6 +647,12 @@ function BracketMatchCard({
   const isCorrection = ['completed', 'disputed'].includes(match.status)
   const showContest = canContest && !canManage && match.status === 'completed' && Boolean(result)
   const showHistoryAction = canManage || canContest
+  const isWalkover = match.result_type === 'walkover' || result?.result_type === 'walkover'
+  const winnerName = getParticipantName(
+    match.winner_registration_id,
+    participantsById,
+    'Vencedor definido',
+  )
 
   return (
     <article className="bracket-match">
@@ -601,11 +666,21 @@ function BracketMatchCard({
         <BracketSlot
           name={participantAName}
           score={match.score_a}
+          scoreLabel={
+            isWalkover && match.winner_registration_id === match.participant_a_registration_id
+              ? 'W.O.'
+              : undefined
+          }
           isWinner={match.winner_registration_id === match.participant_a_registration_id}
         />
         <BracketSlot
           name={participantBName}
           score={match.score_b}
+          scoreLabel={
+            isWalkover && match.winner_registration_id === match.participant_b_registration_id
+              ? 'W.O.'
+              : undefined
+          }
           isWinner={match.winner_registration_id === match.participant_b_registration_id}
           isBye={match.is_bye && !match.participant_b_registration_id}
         />
@@ -615,13 +690,23 @@ function BracketMatchCard({
       )}
       {result && (
         <div className="result-summary">
-          <span className={`badge badge-result-${result.status}`}>
-            {matchResultStatusLabels[result.status]}
-          </span>
+          <div className="status-preview">
+            <span className={`badge badge-result-${result.status}`}>
+              {matchResultStatusLabels[result.status]}
+            </span>
+            <span className={`badge badge-result-${result.result_type}`}>
+              {matchResultTypeLabels[result.result_type]}
+            </span>
+          </div>
           <p>
             Resultado registrado em {formatDateTime(result.submitted_at)}
             {result.notes ? `: ${result.notes}` : '.'}
           </p>
+          {result.result_type === 'walkover' && (
+            <p>
+              W.O. para {winnerName}. Justificativa: {result.walkover_reason ?? result.notes}
+            </p>
+          )}
           {result.status === 'disputed' && result.dispute_reason && (
             <p>Contestacao: {result.dispute_reason}</p>
           )}
@@ -681,6 +766,50 @@ function BracketMatchCard({
           )}
           <button className="button button-secondary" type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Confirmando...' : isCorrection ? 'Corrigir resultado' : 'Confirmar vencedor'}
+          </button>
+        </form>
+      )}
+      {canComplete && (
+        <form
+          className="contest-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            onWalkover()
+          }}
+        >
+          <label className="field" htmlFor={`walkover-winner-${match.id}`}>
+            <span>Vencedor por W.O.</span>
+            <select
+              id={`walkover-winner-${match.id}`}
+              value={form.walkoverWinnerId}
+              onChange={(event) => onFormChange('walkoverWinnerId', event.target.value)}
+              required
+            >
+              <option value="">Selecione</option>
+              {match.participant_a_registration_id && (
+                <option value={match.participant_a_registration_id}>
+                  {participantAName}
+                </option>
+              )}
+              {match.participant_b_registration_id && (
+                <option value={match.participant_b_registration_id}>
+                  {participantBName}
+                </option>
+              )}
+            </select>
+          </label>
+          <label className="field" htmlFor={`walkover-reason-${match.id}`}>
+            <span>Justificativa do W.O.</span>
+            <textarea
+              id={`walkover-reason-${match.id}`}
+              rows={2}
+              value={form.walkoverReason}
+              onChange={(event) => onFormChange('walkoverReason', event.target.value)}
+              required
+            />
+          </label>
+          <button className="button button-ghost" type="submit" disabled={isWalkoverSubmitting}>
+            {isWalkoverSubmitting ? 'Registrando...' : 'Registrar W.O.'}
           </button>
         </form>
       )}
@@ -751,6 +880,7 @@ function BracketMatchCard({
                 {history.map((entry) => (
                   <li key={entry.id}>
                     {formatDateTime(entry.created_at)} - {entry.previous_status ?? 'novo'} para {entry.new_status ?? 'sem status'}
+                    {entry.new_result_type ? ` (${entry.new_result_type})` : ''}
                     {entry.change_reason ? ` - ${entry.change_reason}` : ''}
                   </li>
                 ))}
@@ -766,18 +896,20 @@ function BracketMatchCard({
 function BracketSlot({
   name,
   score,
+  scoreLabel,
   isWinner,
   isBye = false,
 }: {
   name: string
   score: number | null
+  scoreLabel?: string
   isWinner: boolean
   isBye?: boolean
 }) {
   return (
     <div className={isWinner ? 'bracket-slot is-winner' : 'bracket-slot'}>
       <span>{name}</span>
-      <strong>{isBye ? 'BYE' : score ?? '-'}</strong>
+      <strong>{scoreLabel ?? (isBye ? 'BYE' : score ?? '-')}</strong>
     </div>
   )
 }

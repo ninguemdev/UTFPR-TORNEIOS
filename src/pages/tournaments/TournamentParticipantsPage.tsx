@@ -6,10 +6,16 @@ import { useAuth } from '../../context/auth'
 import type { TournamentRegistration, TournamentRegistrationStatus } from '../../lib/supabase/types'
 import {
   canManageTournament,
+  closeTournamentCheckIn,
+  disqualifyTournamentRegistration,
   fetchTournament,
   fetchTournamentRegistrations,
-  publicParticipantStatuses,
+  getRegistrationDisplayStatus,
+  isPublicParticipant,
+  isTournamentCheckInOpen,
+  openTournamentCheckIn,
   registrationTypeLabels,
+  setRegistrationCheckIn,
   tournamentRegistrationStatusLabels,
   updateTournamentRegistrationSeed,
   updateTournamentRegistrationStatus,
@@ -23,6 +29,11 @@ function formatDateTime(value: string | null) {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value))
+}
+
+function toIsoOrNull(value: string) {
+  const normalized = value.trim()
+  return normalized ? new Date(normalized).toISOString() : null
 }
 
 type ManageAction = Extract<
@@ -52,6 +63,11 @@ export function TournamentParticipantsPage({
   const [registrations, setRegistrations] = useState<TournamentRegistration[]>([])
   const [notesByRegistration, setNotesByRegistration] = useState<Record<string, string>>({})
   const [seedsByRegistration, setSeedsByRegistration] = useState<Record<string, string>>({})
+  const [checkInWindow, setCheckInWindow] = useState({
+    opensAt: '',
+    closesAt: '',
+    requiresCheckIn: false,
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState('')
   const [error, setError] = useState('')
@@ -66,6 +82,11 @@ export function TournamentParticipantsPage({
       const nextRegistrations = await fetchTournamentRegistrations(nextTournament.id)
       setTournament(nextTournament)
       setRegistrations(nextRegistrations)
+      setCheckInWindow({
+        opensAt: nextTournament.check_in_opens_at?.slice(0, 16) ?? '',
+        closesAt: nextTournament.check_in_closes_at?.slice(0, 16) ?? '',
+        requiresCheckIn: nextTournament.requires_check_in,
+      })
       setNotesByRegistration(
         nextRegistrations.reduce<Record<string, string>>((notes, registration) => {
           notes[registration.id] = registration.admin_notes ?? ''
@@ -104,9 +125,7 @@ export function TournamentParticipantsPage({
     () =>
       canManage
         ? registrations
-        : registrations.filter((registration) =>
-            publicParticipantStatuses.includes(registration.status),
-          ),
+        : registrations.filter(isPublicParticipant),
     [canManage, registrations],
   )
 
@@ -165,6 +184,126 @@ export function TournamentParticipantsPage({
     }
   }
 
+  async function handleSaveCheckInWindow() {
+    if (!tournament) return
+
+    setIsSubmitting('check-in-window')
+    setError('')
+    setSuccess('')
+
+    try {
+      await openTournamentCheckIn({
+        tournamentId: tournament.id,
+        opensAt: toIsoOrNull(checkInWindow.opensAt),
+        closesAt: toIsoOrNull(checkInWindow.closesAt),
+        requiresCheckIn: checkInWindow.requiresCheckIn,
+      })
+      await loadParticipants()
+      setSuccess('Janela de check-in atualizada.')
+    } catch (checkInError) {
+      setError(
+        checkInError instanceof Error
+          ? checkInError.message
+          : 'Nao foi possivel atualizar o check-in.',
+      )
+    } finally {
+      setIsSubmitting('')
+    }
+  }
+
+  async function handleCloseCheckInWindow() {
+    if (!tournament) return
+    if (!window.confirm('Fechar a janela de check-in agora?')) return
+
+    setIsSubmitting('check-in-close')
+    setError('')
+    setSuccess('')
+
+    try {
+      await closeTournamentCheckIn(tournament.id)
+      await loadParticipants()
+      setSuccess('Janela de check-in fechada.')
+    } catch (checkInError) {
+      setError(
+        checkInError instanceof Error
+          ? checkInError.message
+          : 'Nao foi possivel fechar o check-in.',
+      )
+    } finally {
+      setIsSubmitting('')
+    }
+  }
+
+  async function handleManualCheckIn(
+    registration: TournamentRegistration,
+    isCheckedIn: boolean,
+  ) {
+    const notes = notesByRegistration[registration.id]?.trim() || null
+
+    if (!isCheckedIn && (!notes || notes.length < 3)) {
+      setError('Informe uma justificativa na observacao administrativa para desfazer check-in.')
+      return
+    }
+
+    if (
+      !isCheckedIn &&
+      !window.confirm(`Desfazer check-in de ${registration.display_name}?`)
+    ) {
+      return
+    }
+
+    setIsSubmitting(`${registration.id}:check-in:${isCheckedIn ? 'on' : 'off'}`)
+    setError('')
+    setSuccess('')
+
+    try {
+      await setRegistrationCheckIn({
+        registrationId: registration.id,
+        isCheckedIn,
+        notes,
+      })
+      await loadParticipants()
+      setSuccess(isCheckedIn ? 'Check-in marcado.' : 'Check-in desfeito.')
+    } catch (checkInError) {
+      setError(
+        checkInError instanceof Error
+          ? checkInError.message
+          : 'Nao foi possivel atualizar check-in.',
+      )
+    } finally {
+      setIsSubmitting('')
+    }
+  }
+
+  async function handleDisqualify(registration: TournamentRegistration) {
+    const reason = notesByRegistration[registration.id]?.trim() ?? ''
+
+    if (reason.length < 5) {
+      setError('Informe uma justificativa administrativa com pelo menos 5 caracteres.')
+      return
+    }
+
+    if (!window.confirm(`Desclassificar ${registration.display_name}?`)) return
+
+    setIsSubmitting(`${registration.id}:disqualify`)
+    setError('')
+    setSuccess('')
+
+    try {
+      await disqualifyTournamentRegistration(registration.id, reason)
+      await loadParticipants()
+      setSuccess('Participante desclassificado.')
+    } catch (disqualifyError) {
+      setError(
+        disqualifyError instanceof Error
+          ? disqualifyError.message
+          : 'Nao foi possivel desclassificar participante.',
+      )
+    } finally {
+      setIsSubmitting('')
+    }
+  }
+
   return (
     <AuthenticatedShell subtitle="Participantes">
       <div className="page-stack">
@@ -193,6 +332,85 @@ export function TournamentParticipantsPage({
           <div className="form-message form-message-success" role="status">
             {success}
           </div>
+        )}
+
+        {tournament && canManage && (
+          <section className="surface-panel" aria-labelledby="check-in-panel-title">
+            <div className="section-heading">
+              <h2 id="check-in-panel-title">Check-in</h2>
+              <p>
+                {isTournamentCheckInOpen(tournament)
+                  ? 'Janela aberta para participantes confirmarem presenca.'
+                  : 'Janela fechada ou ainda nao aberta.'}
+                {' '}
+                {tournament.requires_check_in
+                  ? 'A chave exige check-in.'
+                  : 'A chave nao exige check-in.'}
+              </p>
+            </div>
+            <div className="form-grid">
+              <label className="field" htmlFor="check-in-opens-at">
+                <span>Abertura</span>
+                <input
+                  id="check-in-opens-at"
+                  type="datetime-local"
+                  value={checkInWindow.opensAt}
+                  onChange={(event) =>
+                    setCheckInWindow((current) => ({
+                      ...current,
+                      opensAt: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label className="field" htmlFor="check-in-closes-at">
+                <span>Fechamento</span>
+                <input
+                  id="check-in-closes-at"
+                  type="datetime-local"
+                  value={checkInWindow.closesAt}
+                  onChange={(event) =>
+                    setCheckInWindow((current) => ({
+                      ...current,
+                      closesAt: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label className="field checkbox-field" htmlFor="requires-check-in">
+                <input
+                  id="requires-check-in"
+                  type="checkbox"
+                  checked={checkInWindow.requiresCheckIn}
+                  onChange={(event) =>
+                    setCheckInWindow((current) => ({
+                      ...current,
+                      requiresCheckIn: event.target.checked,
+                    }))
+                  }
+                />
+                <span>Exigir check-in para gerar chave</span>
+              </label>
+            </div>
+            <div className="button-row">
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={isSubmitting !== ''}
+                onClick={() => void handleSaveCheckInWindow()}
+              >
+                {isSubmitting === 'check-in-window' ? 'Salvando...' : 'Salvar janela'}
+              </button>
+              <button
+                className="button button-ghost"
+                type="button"
+                disabled={isSubmitting !== '' || !tournament.check_in_opens_at}
+                onClick={() => void handleCloseCheckInWindow()}
+              >
+                {isSubmitting === 'check-in-close' ? 'Fechando...' : 'Fechar agora'}
+              </button>
+            </div>
+          </section>
         )}
 
         {isLoading ? (
@@ -237,6 +455,7 @@ export function TournamentParticipantsPage({
                     <th scope="col">Participante</th>
                     <th scope="col">Tipo</th>
                     <th scope="col">Status</th>
+                    <th scope="col">Check-in</th>
                     {canManage && <th scope="col">Seed</th>}
                     <th scope="col">Inscrito em</th>
                     {canManage && <th scope="col">Gestão</th>}
@@ -251,7 +470,25 @@ export function TournamentParticipantsPage({
                       </th>
                       <td>{registrationTypeLabels[registration.registration_type]}</td>
                       <td>
-                        <TournamentRegistrationStatusBadge status={registration.status} />
+                        <TournamentRegistrationStatusBadge
+                          status={getRegistrationDisplayStatus(registration)}
+                        />
+                        {registration.disqualification_reason && (
+                          <span className="row-note">{registration.disqualification_reason}</span>
+                        )}
+                        {registration.no_show_reason && (
+                          <span className="row-note">{registration.no_show_reason}</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className="table-title">
+                          {registration.checked_in_at ? 'Confirmado' : 'Pendente'}
+                        </span>
+                        <span className="row-note">
+                          {registration.checked_in_at
+                            ? formatDateTime(registration.checked_in_at)
+                            : 'Sem presenca confirmada'}
+                        </span>
                       </td>
                       {canManage && (
                         <td>
@@ -341,6 +578,51 @@ export function TournamentParticipantsPage({
                                 {isSubmitting === `${registration.id}:cancelled`
                                   ? 'Cancelando...'
                                   : 'Cancelar'}
+                              </button>
+                            </div>
+                            <div className="button-row">
+                              <button
+                                className="button button-secondary"
+                                type="button"
+                                disabled={
+                                  isSubmitting !== '' ||
+                                  Boolean(registration.checked_in_at) ||
+                                  Boolean(registration.disqualified_at) ||
+                                  !['confirmed', 'checked_in'].includes(registration.status)
+                                }
+                                onClick={() => void handleManualCheckIn(registration, true)}
+                              >
+                                {isSubmitting === `${registration.id}:check-in:on`
+                                  ? 'Marcando...'
+                                  : 'Marcar check-in'}
+                              </button>
+                              <button
+                                className="button button-ghost"
+                                type="button"
+                                disabled={
+                                  isSubmitting !== '' ||
+                                  !registration.checked_in_at ||
+                                  Boolean(registration.disqualified_at)
+                                }
+                                onClick={() => void handleManualCheckIn(registration, false)}
+                              >
+                                {isSubmitting === `${registration.id}:check-in:off`
+                                  ? 'Desfazendo...'
+                                  : 'Desfazer check-in'}
+                              </button>
+                              <button
+                                className="button button-ghost"
+                                type="button"
+                                disabled={
+                                  isSubmitting !== '' ||
+                                  Boolean(registration.disqualified_at) ||
+                                  ['cancelled', 'rejected'].includes(registration.status)
+                                }
+                                onClick={() => void handleDisqualify(registration)}
+                              >
+                                {isSubmitting === `${registration.id}:disqualify`
+                                  ? 'Desclassificando...'
+                                  : 'Desclassificar'}
                               </button>
                             </div>
                           </div>

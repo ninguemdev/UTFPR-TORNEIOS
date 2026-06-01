@@ -347,3 +347,37 @@ Participante comum nao confirma resultado administrativamente e nao altera parti
 - **Passos:** editar motivo, ativar/desativar ou remover bloqueio.
 - **Erros possiveis:** RLS negando escrita; tentativa de alterar escopo/acao original; motivo vazio.
 - **Estado final:** bloqueio atualizado/removido e auditoria registra `action_lock_updated` ou `action_lock_deleted`.
+
+## Atualizacao: check-in, W.O. e desclassificacao
+
+### Organizador abre/fecha check-in
+
+- **Ator:** admin ou organizador do torneio.
+- **Pre-condicoes:** torneio existente e permissao validada por `can_manage_tournament`.
+- **Passos:** abrir `/torneios/:id/participantes`, definir abertura/fechamento e se check-in e obrigatorio para chave.
+- **Erros possiveis:** janela invalida, bloqueio `manage_registration`, RLS negando permissao.
+- **Estado final:** torneio registra janela e auditoria de atualizacao.
+
+### Usuario faz check-in
+
+- **Ator:** usuario com inscricao confirmada.
+- **Pre-condicoes:** janela aberta, inscricao nao desclassificada.
+- **Passos:** abrir pagina publica do torneio e acionar "Confirmar check-in".
+- **Erros possiveis:** fora da janela, inscricao pendente/rejeitada/cancelada, bloqueio `check_in`.
+- **Estado final:** inscricao passa a `checked_in`, preenche `checked_in_at`/`checked_in_by` e audita a acao.
+
+### Organizador registra W.O.
+
+- **Ator:** admin ou organizador.
+- **Pre-condicoes:** partida pronta/ao vivo/finalizada corrigivel com dois participantes.
+- **Passos:** selecionar vencedor por W.O., informar justificativa e confirmar.
+- **Erros possiveis:** justificativa curta, vencedor fora da partida, proxima partida ja resolvida em correcao.
+- **Estado final:** `match_results.result_type = walkover`, perdedor recebe `no_show_at`, historico registra a mudanca e vencedor avanca.
+
+### Organizador desclassifica participante
+
+- **Ator:** admin ou organizador.
+- **Pre-condicoes:** inscricao visivel ao gestor.
+- **Passos:** informar justificativa na tela de participantes e confirmar desclassificacao.
+- **Erros possiveis:** justificativa curta, usuario comum tentando executar, bloqueio administrativo.
+- **Estado final:** inscricao recebe `disqualified_at`/`disqualification_reason`, sai de novas chaves e aparece com badge claro.

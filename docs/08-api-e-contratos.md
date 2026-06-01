@@ -458,3 +458,42 @@ Consultas:
 - Admin global pode operar apesar do bloqueio para conseguir corrigir ou remover a trava.
 
 Acoes cobertas por triggers/RPCs nesta etapa: `create_tournament`, `edit_tournament`, `delete_tournament`, `register`, `cancel_registration`, `manage_registration`, `manage_teams`, `generate_bracket`, `record_result`, `contest_result` e `recalculate_ranking`.
+
+## Atualizacao: RPCs de check-in, W.O. e desclassificacao
+
+### `open_tournament_check_in`
+
+- **Entrada:** `{ target_tournament_id, target_opens_at, target_closes_at, target_requires_check_in }`
+- **Saida:** sem payload.
+- **Validacoes:** admin/organizador, janela valida, action lock `manage_registration`.
+
+### `close_tournament_check_in`
+
+- **Entrada:** `{ target_tournament_id }`
+- **Saida:** sem payload.
+- **Validacoes:** admin/organizador e action lock `manage_registration`.
+
+### `confirm_registration_check_in`
+
+- **Entrada:** `{ target_registration_id }`
+- **Saida:** sem payload.
+- **Validacoes:** usuario e dono/capitao da inscricao, inscricao confirmada, janela aberta, action lock `check_in`.
+
+### `set_registration_check_in`
+
+- **Entrada:** `{ target_registration_id, target_is_checked_in, target_notes }`
+- **Saida:** sem payload.
+- **Validacoes:** admin/organizador. Ao desfazer, `target_notes` e obrigatorio.
+
+### `disqualify_registration`
+
+- **Entrada:** `{ target_registration_id, target_reason }`
+- **Saida:** sem payload.
+- **Validacoes:** admin/organizador, justificativa minima, action lock `manage_registration`.
+
+### `record_bracket_match_walkover`
+
+- **Entrada:** `{ target_match_id, target_winner_registration_id, target_reason }`
+- **Saida:** sem payload.
+- **Validacoes:** admin/organizador, vencedor pertence a partida, justificativa obrigatoria, action lock `record_result`.
+- **Efeitos:** cria/atualiza `match_results` com `result_type = walkover`, marca perdedor com `no_show_at`, grava historico e avanca vencedor.

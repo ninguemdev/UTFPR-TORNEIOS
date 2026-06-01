@@ -5,15 +5,18 @@ import { AuthenticatedShell } from '../../components/layout/AuthenticatedShell'
 import { useAuth } from '../../context/auth'
 import type { TournamentRegistration } from '../../lib/supabase/types'
 import {
-  activeRegistrationStatuses,
   canManageTournament,
   canUserCancelRegistration,
   cancelTournamentRegistration,
+  confirmRegistrationCheckIn,
   fetchTournament,
   fetchTournamentRegistrations,
   findActiveRegistration,
+  getRegistrationDisplayStatus,
+  isRegistrationOperationallyActive,
   isPublicTournamentStatus,
-  publicParticipantStatuses,
+  isPublicParticipant,
+  isTournamentCheckInOpen,
   registerForTournament,
   registrationTypeLabels,
   tournamentFormatLabels,
@@ -29,6 +32,15 @@ function formatDate(value: string | null) {
   }).format(new Date(`${value}T00:00:00`))
 }
 
+function formatDateTime(value: string | null) {
+  if (!value) return 'Nao definido'
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
+
 export function PublicTournamentPage({ tournamentId }: { tournamentId: string }) {
   const { user, profile, isAdmin, canCreateTournaments } = useAuth()
   const [tournament, setTournament] = useState<TournamentWithCount | null>(null)
@@ -39,15 +51,11 @@ export function PublicTournamentPage({ tournamentId }: { tournamentId: string })
   const [success, setSuccess] = useState('')
 
   const activeRegistrations = useMemo(
-    () => registrations.filter((registration) =>
-      activeRegistrationStatuses.includes(registration.status),
-    ),
+    () => registrations.filter(isRegistrationOperationallyActive),
     [registrations],
   )
   const publicParticipants = useMemo(
-    () => registrations.filter((registration) =>
-      publicParticipantStatuses.includes(registration.status),
-    ),
+    () => registrations.filter(isPublicParticipant),
     [registrations],
   )
 
@@ -63,7 +71,14 @@ export function PublicTournamentPage({ tournamentId }: { tournamentId: string })
     : false
   const canCancelActiveRegistration =
     Boolean(tournament && activeRegistration) &&
+    !activeRegistration?.disqualified_at &&
     canUserCancelRegistration(tournament!, activeRegistration!)
+  const canConfirmCheckIn =
+    Boolean(tournament && activeRegistration) &&
+    activeRegistration?.status === 'confirmed' &&
+    !activeRegistration.checked_in_at &&
+    !activeRegistration.disqualified_at &&
+    isTournamentCheckInOpen(tournament!)
 
   const loadTournament = useCallback(async () => {
     setIsLoading(true)
@@ -159,6 +174,28 @@ export function PublicTournamentPage({ tournamentId }: { tournamentId: string })
     }
   }
 
+  async function handleConfirmCheckIn() {
+    if (!activeRegistration) return
+
+    setIsSubmitting(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      await confirmRegistrationCheckIn(activeRegistration.id)
+      await loadTournament()
+      setSuccess('Check-in confirmado.')
+    } catch (checkInError) {
+      setError(
+        checkInError instanceof Error
+          ? checkInError.message
+          : 'Nao foi possivel confirmar check-in.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <AuthenticatedShell subtitle="Torneio público">
@@ -236,6 +273,18 @@ export function PublicTournamentPage({ tournamentId }: { tournamentId: string })
                 <dt>Tipo</dt>
                 <dd>{registrationTypeLabels[tournament.registration_type]}</dd>
               </div>
+              <div>
+                <dt>Check-in</dt>
+                <dd>{tournament.requires_check_in ? 'Obrigatorio' : 'Opcional'}</dd>
+              </div>
+              <div>
+                <dt>Janela</dt>
+                <dd>
+                  {tournament.check_in_opens_at
+                    ? `${formatDateTime(tournament.check_in_opens_at)} ate ${formatDateTime(tournament.check_in_closes_at)}`
+                    : 'Nao aberta'}
+                </dd>
+              </div>
               {tournament.registration_type === 'team' && (
                 <div>
                   <dt>Equipe</dt>
@@ -288,10 +337,37 @@ export function PublicTournamentPage({ tournamentId }: { tournamentId: string })
             {activeRegistration ? (
               <div className="registration-state">
                 <strong>Sua inscrição está registrada.</strong>
-                <TournamentRegistrationStatusBadge status={activeRegistration.status} />
+                <TournamentRegistrationStatusBadge
+                  status={getRegistrationDisplayStatus(activeRegistration)}
+                />
                 <p>Nome na inscrição: {activeRegistration.display_name}</p>
+                <p>
+                  Check-in:{' '}
+                  {activeRegistration.checked_in_at
+                    ? `confirmado em ${formatDateTime(activeRegistration.checked_in_at)}`
+                    : isTournamentCheckInOpen(tournament)
+                      ? 'janela aberta'
+                      : 'janela fechada'}
+                </p>
+                {activeRegistration.disqualification_reason && (
+                  <p>Desclassificacao: {activeRegistration.disqualification_reason}</p>
+                )}
+                {activeRegistration.no_show_reason && (
+                  <p>W.O.: {activeRegistration.no_show_reason}</p>
+                )}
                 {activeRegistration.admin_notes && (
                   <p>Observação da organização: {activeRegistration.admin_notes}</p>
+                )}
+                <button
+                  className="button button-primary"
+                  type="button"
+                  disabled={isSubmitting || !canConfirmCheckIn}
+                  onClick={() => void handleConfirmCheckIn()}
+                >
+                  {isSubmitting ? 'Confirmando...' : 'Confirmar check-in'}
+                </button>
+                {!canConfirmCheckIn && !activeRegistration.checked_in_at && (
+                  <p>Check-in disponivel apenas para inscricao confirmada durante a janela.</p>
                 )}
                 <button
                   className="button button-secondary"
@@ -389,7 +465,9 @@ export function PublicTournamentPage({ tournamentId }: { tournamentId: string })
                     <h3>{registration.display_name}</h3>
                     <p>{registrationTypeLabels[registration.registration_type]}</p>
                   </div>
-                  <TournamentRegistrationStatusBadge status={registration.status} />
+                  <TournamentRegistrationStatusBadge
+                    status={getRegistrationDisplayStatus(registration)}
+                  />
                 </article>
               ))}
             </div>

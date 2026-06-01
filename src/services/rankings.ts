@@ -117,6 +117,8 @@ function mapRankingMatches(matches: BracketMatch[], results: MatchResult[]) {
       scoreB: match.score_b,
       status: match.status,
       resultStatus: result?.status ?? null,
+      resultType: result?.result_type ?? match.result_type ?? 'score',
+      winnerRegistrationId: result?.winner_registration_id ?? match.winner_registration_id,
       groupId: null,
     }
   })

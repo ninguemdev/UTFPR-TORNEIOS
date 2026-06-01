@@ -7,6 +7,7 @@ import {
   canUserCancelRegistration,
   cancelTournamentRegistration,
   fetchMyTournamentRegistrations,
+  getRegistrationDisplayStatus,
   registrationTypeLabels,
   type MyTournamentRegistration,
 } from '../../services/tournaments'
@@ -125,7 +126,9 @@ export function MyRegistrationsPage() {
               return (
                 <article className="request-card surface-panel" key={registration.id}>
                   <div className="card-topline">
-                    <TournamentRegistrationStatusBadge status={registration.status} />
+                    <TournamentRegistrationStatusBadge
+                      status={getRegistrationDisplayStatus(registration)}
+                    />
                     <span>{formatDateTime(registration.created_at)}</span>
                   </div>
                   <div className="request-reason">

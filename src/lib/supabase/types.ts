@@ -69,6 +69,8 @@ export type MatchResultStatus =
   | 'resolved'
   | 'cancelled'
 
+export type MatchResultType = 'score' | 'walkover'
+
 export type ActionLockScope =
   | 'global'
   | 'tournament'
@@ -130,6 +132,9 @@ export type Tournament = {
   allow_free_agents: boolean
   require_full_team_before_registration: boolean
   team_registration_deadline: string | null
+  requires_check_in: boolean
+  check_in_opens_at: string | null
+  check_in_closes_at: string | null
   starts_at: string | null
   ends_at: string | null
   created_by: string
@@ -152,6 +157,17 @@ export type TournamentRegistration = {
   decided_at: string | null
   cancelled_by: string | null
   cancelled_at: string | null
+  checked_in_at: string | null
+  checked_in_by: string | null
+  check_in_notes: string | null
+  check_in_revoked_by: string | null
+  check_in_revoked_at: string | null
+  disqualified_at: string | null
+  disqualified_by: string | null
+  disqualification_reason: string | null
+  no_show_at: string | null
+  no_show_by: string | null
+  no_show_reason: string | null
   created_at: string
   updated_at: string
 }
@@ -191,6 +207,10 @@ export type BracketMatch = {
   submitted_at: string | null
   confirmed_by: string | null
   confirmed_at: string | null
+  result_type: MatchResultType
+  walkover_reason: string | null
+  walkover_by: string | null
+  walkover_at: string | null
   created_at: string
   updated_at: string
 }
@@ -204,6 +224,7 @@ export type MatchResult = {
   score_b: number
   winner_registration_id: string
   status: MatchResultStatus
+  result_type: MatchResultType
   notes: string | null
   submitted_by: string | null
   submitted_at: string
@@ -215,6 +236,9 @@ export type MatchResult = {
   resolved_by: string | null
   resolved_at: string | null
   resolution_notes: string | null
+  walkover_reason: string | null
+  walkover_by: string | null
+  walkover_at: string | null
   created_at: string
   updated_at: string
 }
@@ -231,6 +255,8 @@ export type MatchResultHistory = {
   new_winner_registration_id: string | null
   previous_status: BracketMatchStatus | null
   new_status: BracketMatchStatus | null
+  previous_result_type: MatchResultType | null
+  new_result_type: MatchResultType | null
   changed_by: string | null
   change_reason: string | null
   created_at: string
@@ -427,6 +453,9 @@ export type Database = {
               | 'allow_free_agents'
               | 'require_full_team_before_registration'
               | 'team_registration_deadline'
+              | 'requires_check_in'
+              | 'check_in_opens_at'
+              | 'check_in_closes_at'
               | 'starts_at'
               | 'ends_at'
             >
@@ -448,6 +477,9 @@ export type Database = {
             | 'allow_free_agents'
             | 'require_full_team_before_registration'
             | 'team_registration_deadline'
+            | 'requires_check_in'
+            | 'check_in_opens_at'
+            | 'check_in_closes_at'
             | 'starts_at'
             | 'ends_at'
           >
@@ -463,7 +495,14 @@ export type Database = {
           Partial<
             Pick<
               TournamentRegistration,
-              'status' | 'registration_type' | 'captain_user_id' | 'team_id' | 'seed'
+              | 'status'
+              | 'registration_type'
+              | 'captain_user_id'
+              | 'team_id'
+              | 'seed'
+              | 'checked_in_at'
+              | 'checked_in_by'
+              | 'check_in_notes'
             >
           >
         Update: Partial<
@@ -477,6 +516,17 @@ export type Database = {
             | 'cancelled_by'
             | 'cancelled_at'
             | 'seed'
+            | 'checked_in_at'
+            | 'checked_in_by'
+            | 'check_in_notes'
+            | 'check_in_revoked_by'
+            | 'check_in_revoked_at'
+            | 'disqualified_at'
+            | 'disqualified_by'
+            | 'disqualification_reason'
+            | 'no_show_at'
+            | 'no_show_by'
+            | 'no_show_reason'
           >
         >
         Relationships: []
@@ -532,6 +582,10 @@ export type Database = {
               | 'submitted_at'
               | 'confirmed_by'
               | 'confirmed_at'
+              | 'result_type'
+              | 'walkover_reason'
+              | 'walkover_by'
+              | 'walkover_at'
             >
           >
         Update: Partial<
@@ -551,6 +605,10 @@ export type Database = {
             | 'submitted_at'
             | 'confirmed_by'
             | 'confirmed_at'
+            | 'result_type'
+            | 'walkover_reason'
+            | 'walkover_by'
+            | 'walkover_at'
           >
         >
         Relationships: []
@@ -570,6 +628,7 @@ export type Database = {
             Pick<
               MatchResult,
               | 'status'
+              | 'result_type'
               | 'notes'
               | 'submitted_by'
               | 'submitted_at'
@@ -581,6 +640,9 @@ export type Database = {
               | 'resolved_by'
               | 'resolved_at'
               | 'resolution_notes'
+              | 'walkover_reason'
+              | 'walkover_by'
+              | 'walkover_at'
             >
           >
         Update: Partial<
@@ -590,6 +652,7 @@ export type Database = {
             | 'score_b'
             | 'winner_registration_id'
             | 'status'
+            | 'result_type'
             | 'notes'
             | 'submitted_by'
             | 'submitted_at'
@@ -601,6 +664,9 @@ export type Database = {
             | 'resolved_by'
             | 'resolved_at'
             | 'resolution_notes'
+            | 'walkover_reason'
+            | 'walkover_by'
+            | 'walkover_at'
           >
         >
         Relationships: []
@@ -620,6 +686,8 @@ export type Database = {
               | 'new_winner_registration_id'
               | 'previous_status'
               | 'new_status'
+              | 'previous_result_type'
+              | 'new_result_type'
               | 'changed_by'
               | 'change_reason'
             >
@@ -793,12 +861,24 @@ export type Database = {
         }
         Returns: TeamMemberWithProfile[]
       }
+      close_tournament_check_in: {
+        Args: {
+          target_tournament_id: string
+        }
+        Returns: void
+      }
       complete_bracket_match: {
         Args: {
           target_match_id: string
           target_winner_registration_id: string
           target_score_a: number
           target_score_b: number
+        }
+        Returns: void
+      }
+      confirm_registration_check_in: {
+        Args: {
+          target_registration_id: string
         }
         Returns: void
       }
@@ -827,6 +907,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_tournament_check_in_open: {
+        Args: {
+          target_tournament_id: string
+        }
+        Returns: boolean
+      }
+      open_tournament_check_in: {
+        Args: {
+          target_tournament_id: string
+          target_opens_at?: string | null
+          target_closes_at?: string | null
+          target_requires_check_in?: boolean
+        }
+        Returns: void
+      }
       record_bracket_match_result: {
         Args: {
           target_match_id: string
@@ -838,11 +933,34 @@ export type Database = {
         }
         Returns: void
       }
+      record_bracket_match_walkover: {
+        Args: {
+          target_match_id: string
+          target_winner_registration_id: string
+          target_reason: string
+        }
+        Returns: void
+      }
       resolve_match_dispute: {
         Args: {
           target_match_id: string
           target_resolution_action?: 'confirm' | 'cancel'
           target_resolution_notes?: string | null
+        }
+        Returns: void
+      }
+      set_registration_check_in: {
+        Args: {
+          target_registration_id: string
+          target_is_checked_in: boolean
+          target_notes?: string | null
+        }
+        Returns: void
+      }
+      disqualify_registration: {
+        Args: {
+          target_registration_id: string
+          target_reason: string
         }
         Returns: void
       }

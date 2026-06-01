@@ -29,6 +29,16 @@ export type MatchResultValidation = {
   errors: string[]
 }
 
+export type WalkoverValidationInput = {
+  status: BracketMatchStatus
+  isBye: boolean
+  participantAId: string | null
+  participantBId: string | null
+  winnerRegistrationId: string | null
+  reason: string
+  isCorrection?: boolean
+}
+
 export function isDrawAllowed(format: MatchResultFormat | string) {
   return !['single_elimination', 'best_of_3', 'best_of_5', 'best_of_7'].includes(format)
 }
@@ -162,4 +172,33 @@ export function validateContestReason(reason: string) {
   }
 
   return null
+}
+
+export function validateWalkoverResult(input: WalkoverValidationInput) {
+  const errors: string[] = []
+  const receiveError = canMatchReceiveResult({
+    status: input.status,
+    isBye: input.isBye,
+    participantAId: input.participantAId,
+    participantBId: input.participantBId,
+    isCorrection: input.isCorrection,
+  })
+
+  if (receiveError) errors.push(receiveError)
+
+  if (
+    !input.winnerRegistrationId ||
+    ![input.participantAId, input.participantBId].includes(input.winnerRegistrationId)
+  ) {
+    errors.push('W.O. precisa indicar um vencedor da partida.')
+  }
+
+  if (input.reason.trim().length < 5) {
+    errors.push('W.O. exige justificativa administrativa com pelo menos 5 caracteres.')
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  }
 }

@@ -213,3 +213,11 @@ Prioridades:
 | RF-085 | Exibir criterios de desempate. | MVP | Tela mostra pontos, vitorias, saldo, score pro, confronto direto quando aplicavel e fallback por seed/nome. |
 | RF-086 | Ignorar partidas sem resultado confiavel. | MVP | Partidas pendentes, canceladas, com bye ou contestadas nao entram no calculo. |
 | RF-087 | Indicar empate tecnico. | MVP | Se os criterios principais nao separarem participantes, a interface indica empate tecnico. |
+## Atualizacao: check-in, W.O. e desclassificacao
+
+- RF-023 passa a ser MVP funcional: admin/organizador abre e fecha janela de check-in, usuario confirmado pode confirmar presenca dentro da janela e gestor pode marcar/desfazer check-in com justificativa.
+- RF-024 passa a ser MVP funcional: `tournaments.requires_check_in`, `check_in_opens_at` e `check_in_closes_at` controlam a janela e a exigencia antes da chave.
+- Geracao de chave deve ignorar inscricoes sem check-in quando `requires_check_in = true`.
+- Inscricoes desclassificadas ou marcadas com W.O. (`disqualified_at` ou `no_show_at`) nao entram em novas chaves.
+- W.O. e registrado como `result_type = walkover`, exige vencedor e justificativa, entra no historico de resultado e pode ser contestado por participante da partida.
+- Desclassificacao e acao administrativa sensivel: exige justificativa, e auditada e nao pode ser executada por usuario comum.

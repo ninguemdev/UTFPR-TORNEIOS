@@ -44,6 +44,11 @@ export const matchResultStatusLabels: Record<MatchResult['status'], string> = {
   cancelled: 'Cancelado',
 }
 
+export const matchResultTypeLabels: Record<MatchResult['result_type'], string> = {
+  score: 'Placar',
+  walkover: 'W.O.',
+}
+
 function getBracketError(message: string) {
   const normalized = message.toLowerCase()
 
@@ -59,10 +64,22 @@ function getBracketError(message: string) {
     return 'Nao e seguro corrigir este resultado porque a chave ja avancou. Cancele ou resolva as partidas dependentes antes.'
   }
 
+  if (
+    normalized.includes('check-in') ||
+    normalized.includes('w.o') ||
+    normalized.includes('walkover') ||
+    normalized.includes('desclass') ||
+    normalized.includes('bloqueada')
+  ) {
+    return message
+  }
+
   return message
 }
 
-export async function fetchBracketParticipants(tournament: Pick<Tournament, 'id' | 'registration_type'>) {
+export async function fetchBracketParticipants(
+  tournament: Pick<Tournament, 'id' | 'registration_type' | 'requires_check_in'>,
+) {
   const { data, error } = await supabase
     .from('tournament_registrations')
     .select('*')
@@ -74,6 +91,16 @@ export async function fetchBracketParticipants(tournament: Pick<Tournament, 'id'
   if (error) throw new Error(getBracketError(error.message))
 
   return data.filter((registration) => {
+    if (registration.disqualified_at || registration.no_show_at) return false
+
+    if (
+      tournament.requires_check_in &&
+      !registration.checked_in_at &&
+      registration.status !== 'checked_in'
+    ) {
+      return false
+    }
+
     if (tournament.registration_type === 'team') {
       return registration.registration_type === 'team' && registration.team_id !== null
     }
@@ -252,6 +279,20 @@ export async function completeBracketMatch(params: {
     target_score_b: params.scoreB,
     target_notes: params.notes,
     target_change_reason: params.changeReason,
+  })
+
+  if (error) throw new Error(getBracketError(error.message))
+}
+
+export async function completeBracketMatchByWalkover(params: {
+  matchId: string
+  winnerRegistrationId: string
+  reason: string
+}) {
+  const { error } = await supabase.rpc('record_bracket_match_walkover', {
+    target_match_id: params.matchId,
+    target_winner_registration_id: params.winnerRegistrationId,
+    target_reason: params.reason,
   })
 
   if (error) throw new Error(getBracketError(error.message))

@@ -32,6 +32,7 @@ export const actionLockActionOptions = [
   'delete_tournament',
   'register',
   'cancel_registration',
+  'check_in',
   'manage_registration',
   'manage_teams',
   'generate_bracket',

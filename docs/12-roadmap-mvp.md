@@ -154,7 +154,7 @@ Limites mantidos:
 
 - Ranking basico ja possui algoritmo e tela preparada, mas ainda nao ha gerador proprio de pontos corridos/grupos.
 - Sem melhor de N estruturado.
-- Sem W.O. automatico.
+- W.O. manual implementado por `result_type = walkover`; W.O. automatico por agenda/atraso segue futuro.
 - Correcoes de vencedor sao bloqueadas quando partidas dependentes ja possuem resultado ou estao em andamento.
 
 ## Atualizacao: Fase 8 parcial - ranking basico
@@ -172,7 +172,7 @@ Limites mantidos:
 - Ainda nao ha geracao real de calendario round robin ou grupos.
 - O ranking de mata-mata simples nao foi transformado em classificacao completa.
 - Snapshots SQL estao preparados, mas a tela atual recalcula em tempo de leitura a partir dos dados disponiveis.
-- W.O., Elo, sistema suico e estatisticas avancadas continuam fora do MVP desta etapa.
+- Elo, sistema suico, estatisticas avancadas e W.O. automatico por regras de agenda continuam fora do MVP desta etapa.
 
 ## Atualizacao: base de infraestrutura Supabase
 
@@ -213,4 +213,4 @@ Limites mantidos:
 
 - `ip_address` e `user_agent` permanecem nulos ate existir camada server/Edge Function que capture metadados de requisicao.
 - `global_settings` ainda nao foi implementado.
-- Auditoria de agenda, grupos e W.O. fica para quando esses modulos existirem.
+- Auditoria de agenda e grupos fica para quando esses modulos existirem; W.O. manual ja entra em `match_results`, `match_result_history` e `audit_logs`.

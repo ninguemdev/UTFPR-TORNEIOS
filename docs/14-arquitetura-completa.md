@@ -1796,7 +1796,7 @@ Ela deve ser atualizada sempre que uma funcionalidade sair de `Parcial` ou
 | CRUD de torneios | Implementado | `tournaments`, `TournamentForm`, services | Admin pode excluir; criador autorizado gerencia apenas seus torneios. |
 | Listagem publica de torneios | Implementado | `TournamentsPage`, RLS de torneios publicados | Draft nao deve aparecer publicamente. |
 | Inscricao individual | Implementado | `tournament_registrations`, pagina publica e participantes | Nova inscricao inicia `pending`; gestor confirma/rejeita/check-in. |
-| Check-in | Parcial | status `checked_in` em inscricoes | Existe como status/acao administrativa; falta janela formal de check-in. |
+| Check-in | Implementado | `requires_check_in`, janela em `tournaments`, RPCs e paginas publica/participantes | Janela formal, auto check-in, check-in manual e filtro de chave implementados. |
 | Equipes | Implementado | `teams`, `team_members`, paginas de equipes | Inclui capitao automatico, membros por email/RA e envio para inscricao. |
 | Agentes livres | Pendente | campos em `tournaments` | `allow_free_agents` esta preparado, mas fluxo nao existe. |
 | Mata-mata simples | Implementado | `singleElimination.ts`, `tournament_brackets`, `bracket_matches` | Gera chave, byes, seeded/draw e avanco de vencedor. |
@@ -1807,6 +1807,8 @@ Ela deve ser atualizada sempre que uma funcionalidade sair de `Parcial` ou
 | Sistema suico | Futuro | docs | Nao ha modelo de rodadas, pareamento ou criterios Buchholz persistidos. |
 | Scheduling | Pendente | campos basicos em `bracket_matches` nao existem para agenda real | Faltam data, hora, local/servidor, deteccao de conflito e tempo minimo entre partidas. |
 | Registro de resultado | Implementado | `record_bracket_match_result()`, UI de chave | Fluxo atual cobre mata-mata simples sem empate. |
+| W.O. | Implementado | `result_type = walkover`, `record_bracket_match_walkover()`, historico e UI de chave | Exige vencedor/justificativa, marca no-show, permite contestacao e afeta ranking sem saldo. |
+| Desclassificacao | Implementado | campos derivados em `tournament_registrations`, RPC e tela de participantes | Exige justificativa, audita e remove de novas chaves. |
 | Contestacao e resolucao | Implementado | `contest_match_result()`, `resolve_match_dispute()` | Participante contesta; gestor resolve com observacao. |
 | Historico de resultados | Implementado | `match_result_history` | Historico e restrito a gestor ou participante autenticado. |
 | Ranking basico | Implementado | `ranking.ts`, `TournamentRankingPage` | Calcula no cliente a partir de partidas disponiveis. |
@@ -2200,13 +2202,21 @@ Arquitetura futura:
 
 ### W.O. e desclassificacao
 
-Arquitetura pendente:
+Estado implementado:
 
-- representar W.O. como tipo de resultado ou status complementar;
-- definir impacto em ranking, chave e historico;
-- exigir justificativa administrativa;
-- impedir uso ambiguo de placar comum para W.O.;
-- documentar criterios por modalidade.
+- W.O. usa `match_results.result_type = walkover` e RPC `record_bracket_match_walkover`;
+- vencedor e justificativa administrativa sao obrigatorios;
+- perdedor recebe `no_show_at` e o vencedor avanca na chave;
+- historico registra `previous_result_type` e `new_result_type`;
+- ranking conta W.O. como vitoria/derrota sem saldo de score;
+- desclassificacao usa `disqualified_at`, `disqualified_by` e `disqualification_reason`;
+- participantes desclassificados ou com no-show ficam fora de novas chaves.
+
+Pendente:
+
+- parametrizar pontuacao/penalidade de W.O. por modalidade;
+- fluxo de reversao de desclassificacao com dupla aprovacao;
+- politica automatica para W.O. recorrente.
 
 ### Configuracoes globais e bloqueios
 
@@ -2342,3 +2352,110 @@ UI React
 O banco e a fonte de verdade para seguranca e estado persistente. O front-end
 controla experiencia, validacoes iniciais e visualizacao. Algoritmos de
 torneio ficam fora da UI para permitir teste e evolucao.
+
+## Atualizacao operacional: check-in, W.O. e desclassificacao
+
+### Check-in formal
+
+O check-in deixa de ser apenas um status manual e passa a ter janela formal no torneio:
+
+- `tournaments.requires_check_in` define se a chave exige presenca confirmada.
+- `check_in_opens_at` e `check_in_closes_at` definem a janela.
+- Usuario confirmado usa `confirm_registration_check_in` dentro da janela.
+- Admin/organizador usa `set_registration_check_in` para marcar ou desfazer check-in, com justificativa no desfazer.
+
+A geracao de chave filtra inscritos sem `checked_in_at` quando `requires_check_in = true`, e o banco valida participantes de `bracket_matches` por `is_registration_bracket_eligible`.
+
+### W.O.
+
+W.O. e representado por `match_results.result_type = walkover`, nao por placar comum. O placar fisico do resultado permanece tecnico para compatibilidade, mas a UI e ranking usam `result_type`.
+
+Regras implementadas:
+
+- vencedor obrigatorio;
+- justificativa obrigatoria;
+- historico em `match_result_history`;
+- perdedor recebe `no_show_at`/`no_show_reason`;
+- vencedor avanca no mata-mata;
+- participante pode contestar, admin/organizador resolve.
+
+No ranking, W.O. conta como vitoria/derrota e nao altera saldo de score.
+
+### Desclassificacao
+
+Desclassificacao fica na inscricao por campos derivados:
+
+- `disqualified_at`;
+- `disqualified_by`;
+- `disqualification_reason`.
+
+Usuario comum nao executa desclassificacao. Admin/organizador deve informar justificativa. Novas chaves ignoram participantes desclassificados. Se a chave ja existir, a resolucao recomendada e registrar W.O. do adversario ou usar `action_locks` para bloquear a operacao ate decisao manual.
+
+## Atualizacao visual: design system UTFPR
+
+### Escopo da mudanca
+
+A camada visual foi consolidada em `src/index.css` e `src/App.css` sem alterar
+RLS, schema Supabase, services, algoritmos ou regras de negocio.
+
+`src/index.css` concentra tokens e base global:
+
+- paleta institucional UTFPR com `--color-brand-black`, `--color-brand-black-2`,
+  `--color-brand-yellow`, `--color-brand-yellow-2` e
+  `--color-brand-yellow-soft`;
+- neutros de fundo, superficie, texto e borda;
+- cores funcionais para sucesso, erro, aviso e informacao;
+- escala de espacos, raios, sombras, containers, z-index e duracoes;
+- reset global, foco visivel, selecao de texto e `prefers-reduced-motion`.
+
+`src/App.css` concentra a implementacao visual:
+
+- layout global, header, navegacao e botao de voltar;
+- botoes, formularios, cards, paineis, badges, tabelas e estados;
+- componentes de torneio: cards, participantes, equipes, chave, ranking e agenda;
+- componentes administrativos: pedidos, bloqueios, auditoria e estados de gestao;
+- auth, perfil, avatar picker, user menu, modal e toast;
+- responsividade mobile-first para 320px ate desktop amplo.
+
+### Regras de identidade
+
+- Amarelo UTFPR e usado para CTA principal, foco, destaque de vencedor, detalhe de card e sinais de marca.
+- Preto/grafite e usado para marca, contraste institucional, texto forte e placares destacados.
+- Fundos permanecem claros/off-white para leitura.
+- Verde, vermelho, azul e aviso ficam restritos a estados funcionais.
+- Cards e paineis usam bordas sutis, sombras leves e raio curto.
+- O padrao tecnico aparece em grids discretos de fundo, sem gradientes pesados.
+
+### Componentes visuais
+
+- `button-primary`: CTA amarelo com texto grafite.
+- `button-secondary`: acao secundaria em superficie clara.
+- `button-ghost`: acao auxiliar.
+- `badge-*`: status com texto explicito e ponto visual.
+- `.table-scroll`: wrapper obrigatorio para tabelas largas.
+- `.bracket`: lista vertical em mobile e colunas por rodada no desktop.
+- `.bracket-slot.is-winner`: vencedor destacado por borda, fundo e contraste no placar.
+- `.form-message-*`, `.loading-state`, `.empty-state` e `.error-state`: estados globais consistentes.
+
+### Acessibilidade e responsividade
+
+O CSS preserva as estruturas ja existentes no React:
+
+- labels em formularios;
+- `aria-current` na navegacao;
+- `aria-expanded` no menu mobile;
+- `role="status"` e `role="alert"` em mensagens;
+- tabs com `role="tablist"` e `aria-selected`;
+- botao mobile que fecha com Escape via `SiteHeader`.
+
+As tabelas continuam com overflow horizontal controlado. A chave mata-mata evita
+rolagem agressiva em mobile ao empilhar rodadas e usa colunas apenas em desktop.
+
+### Arquivos alterados nesta etapa visual
+
+- `src/index.css`
+- `src/App.css`
+- `docs/09-ui-ux-design-system.md`
+- `docs/10-css-responsividade-acessibilidade.md`
+- `docs/13-checklist-code-review.md`
+- `docs/14-arquitetura-completa.md`

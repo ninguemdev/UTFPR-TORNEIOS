@@ -361,3 +361,15 @@ Validacao manual pela UI:
 - Conferir aviso para mata-mata simples.
 - Como admin/organizador, usar "Recalcular ranking" e confirmar que a tela recarrega dados derivados.
 - Como usuario comum/visitante, confirmar que nao aparece acao administrativa.
+
+## Atualizacao: testes manuais de check-in, W.O. e desclassificacao
+
+- Admin/organizador abre janela de check-in em `/torneios/:id/participantes`; verificar campos em `tournaments` e evento de auditoria de torneio.
+- Usuario confirmado acessa a pagina publica dentro da janela e confirma check-in; verificar `checked_in_at`, `checked_in_by` e badge `Check-in feito`.
+- Usuario tenta check-in antes da abertura ou apos fechamento; RPC deve retornar erro e nao alterar inscricao.
+- Admin marca check-in manualmente e desfaz com justificativa; verificar `check_in_notes` e eventos `registration_checked_in`/`registration_check_in_revoked`.
+- Torneio com `requires_check_in = true`: gerar chave deve considerar apenas inscricoes com check-in. Insert direto em `bracket_matches` com participante inelegivel deve falhar.
+- Registrar W.O. em partida pronta: exigir vencedor e justificativa, criar `match_results.result_type = walkover`, marcar perdedor com `no_show_at`, avancar vencedor e criar historico.
+- Participante da partida contesta W.O.; resultado fica `disputed` e admin/organizador resolve mantendo ou cancelando.
+- Admin/organizador desclassifica participante com justificativa; verificar badge `Desclassificada`, auditoria e exclusao da geracao de chave.
+- Usuario comum tenta chamar `disqualify_registration`, `set_registration_check_in` ou escrever campos administrativos direto; RLS/RPC deve negar.
