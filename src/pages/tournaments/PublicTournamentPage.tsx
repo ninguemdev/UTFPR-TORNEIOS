@@ -228,7 +228,7 @@ export function PublicTournamentPage({ tournamentId }: { tournamentId: string })
         <section className="public-cover" aria-labelledby="public-tournament-title">
           <SupabaseTournamentStatusBadge status={tournament.status} />
           <h1 id="public-tournament-title">{tournament.name}</h1>
-          <p>{tournament.description || 'Torneio acadêmico cadastrado na plataforma UTFPR Torneios.'}</p>
+          <p>{tournament.description || 'Torneio cadastrado na Chaveia.'}</p>
           {!isPublicTournamentStatus(tournament.status) && (
             <p className="subtle-note">Este torneio ainda está em rascunho e não aparece publicamente.</p>
           )}

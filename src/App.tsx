@@ -456,12 +456,12 @@ function HomePage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
     <div className="page-stack">
       <section className="hero-section" aria-labelledby="home-title">
         <div className="hero-content">
-          <span className="eyebrow">Sistema acadêmico da UTFPR</span>
-          <h1 id="home-title">UTFPR Torneios</h1>
+          <span className="eyebrow">Plataforma de torneios e e-sports</span>
+          <h1 id="home-title">CHAVEIA</h1>
           <p className="hero-copy">
-            Uma base visual para organizar inscrições, equipes, chaves,
-            partidas, resultados, rankings e disputas em torneios acadêmicos e
-            e-sports.
+            Monta o time. Chaveia o torneio. Organize inscrições, equipes,
+            chaves, partidas, resultados, rankings e disputas — tudo em
+            um lugar só.
           </p>
           <div className="hero-actions">
             <button className="button button-primary" type="button" onClick={() => onNavigate('dashboard')}>
@@ -478,7 +478,7 @@ function HomePage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
             <TournamentStatusBadge status="registration_open" />
             <span>Grupos + playoffs</span>
           </div>
-          <h2>Copa UTFPR Valorant</h2>
+          <h2>Copa Pixel Valorant</h2>
           <p>8 equipes, check-in obrigatório e ranking com critérios explícitos.</p>
           <div className="metric-grid compact">
             <MetricCard label="Inscritos" value="6/8" detail="2 vagas abertas" />
@@ -533,8 +533,8 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: PageId) => void }) {
             <p>Fluxo operacional do próximo ciclo.</p>
           </div>
           <div className="action-list">
-            <ScheduleItem title="Validar resultado contestado" meta="Semifinal - Gamma UTF x Omega Campus" status="contested" />
-            <ScheduleItem title="Publicar chave provisória" meta="Copa UTFPR Valorant - playoffs" status="pending" />
+            <ScheduleItem title="Validar resultado contestado" meta="Semifinal - Pixel Punks x Lag Lords" status="contested" />
+            <ScheduleItem title="Publicar chave provisória" meta="Copa Pixel Valorant - playoffs" status="pending" />
             <ScheduleItem title="Confirmar check-in" meta="2 equipes ainda pendentes" status="live" />
           </div>
         </article>
@@ -676,7 +676,7 @@ function CreateTournamentPage({
           </div>
           <div className="form-grid">
             <Field label="Nome do torneio" htmlFor="tournament-name">
-              <input id="tournament-name" name="tournamentName" type="text" placeholder="Copa UTFPR Valorant" />
+              <input id="tournament-name" name="tournamentName" type="text" placeholder="Copa Pixel Valorant" />
             </Field>
             <Field label="Modalidade" htmlFor="modality">
               <input id="modality" name="modality" type="text" placeholder="Valorant, Xadrez, Futsal" />
@@ -736,7 +736,7 @@ function PublicTournamentPage({
     <div className="page-stack">
       <section className="public-cover" aria-labelledby="public-title">
         <TournamentStatusBadge status="registration_open" />
-        <h1 id="public-title">Copa UTFPR Valorant</h1>
+        <h1 id="public-title">Copa Pixel Valorant</h1>
         <p>
           Página pública com status de inscrições, agenda, participantes,
           formato, critérios de classificação e alertas de dados provisórios.

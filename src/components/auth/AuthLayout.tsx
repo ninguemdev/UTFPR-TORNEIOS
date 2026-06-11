@@ -18,12 +18,9 @@ export function AuthLayout({
       <section className="auth-shell" aria-labelledby="auth-title">
         <div className="auth-hero">
           <a className="brand" href="#home">
-            <span className="brand-mark" aria-hidden="true">
-              UT
-            </span>
             <span>
-              <span className="brand-title">UTFPR Torneios</span>
-              <span className="brand-subtitle">Organização acadêmica</span>
+              <span className="brand-title">CHAVEIA</span>
+              <span className="brand-subtitle">torneios e e-sports</span>
             </span>
           </a>
           <a className="auth-home-link" href="#home">

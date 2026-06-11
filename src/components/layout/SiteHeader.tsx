@@ -40,7 +40,7 @@ function isCurrentRoute(currentHash: string, href: string) {
   return current === target
 }
 
-export function SiteHeader({ subtitle = 'Organizacao academica' }: SiteHeaderProps) {
+export function SiteHeader({ subtitle = 'torneios e e-sports' }: SiteHeaderProps) {
   const { session, isAdmin, canCreateTournaments } = useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [currentHash, setCurrentHash] = useState(() => window.location.hash || '#home')
@@ -83,11 +83,8 @@ export function SiteHeader({ subtitle = 'Organizacao academica' }: SiteHeaderPro
   return (
     <header className="app-header">
       <a className="brand" href="#home">
-        <span className="brand-mark" aria-hidden="true">
-          UT
-        </span>
         <span>
-          <span className="brand-title">UTFPR Torneios</span>
+          <span className="brand-title">CHAVEIA</span>
           <span className="brand-subtitle">{subtitle}</span>
         </span>
       </a>

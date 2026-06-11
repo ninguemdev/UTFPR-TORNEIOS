@@ -75,8 +75,8 @@ export type GroupTable = {
 
 export const tournaments: Tournament[] = [
   {
-    id: 'valorant-utfpr-2026',
-    name: 'Copa UTFPR Valorant',
+    id: 'copa-pixel-valorant-2026',
+    name: 'Copa Pixel Valorant',
     modality: 'Valorant',
     campus: 'Curitiba',
     status: 'registration_open',
@@ -104,7 +104,7 @@ export const tournaments: Tournament[] = [
   },
   {
     id: 'futsal-integracao-2026',
-    name: 'Futsal Integração UTFPR',
+    name: 'Futsal Integração',
     modality: 'Futsal',
     campus: 'Campo Mourão',
     status: 'finished',
@@ -112,7 +112,7 @@ export const tournaments: Tournament[] = [
     teams: 8,
     registrations: 8,
     startsAt: '10 abril 2026',
-    organizer: 'Atlética UTFPR',
+    organizer: 'Atlética Campus',
     description:
       'Competição encerrada com final publicada, disputa de terceiro lugar e auditoria de W.O.',
   },
@@ -122,9 +122,9 @@ export const teams: Team[] = [
   { id: 'aurora', name: 'Aurora Tech', captain: 'Larissa N.', members: 5, seed: 1, checkedIn: true },
   { id: 'byte', name: 'Byte Builders', captain: 'Rafael M.', members: 5, seed: 2, checkedIn: true },
   { id: 'delta', name: 'Delta Labs', captain: 'Camila P.', members: 5, seed: 3, checkedIn: true },
-  { id: 'gamma', name: 'Gamma UTF', captain: 'Joao V.', members: 4, seed: 4, checkedIn: false },
+  { id: 'gamma', name: 'Pixel Punks', captain: 'Joao V.', members: 4, seed: 4, checkedIn: false },
   { id: 'nexus', name: 'Nexus Arena', captain: 'Bianca S.', members: 5, seed: 5, checkedIn: true },
-  { id: 'omega', name: 'Omega Campus', captain: 'Heitor C.', members: 5, seed: 6, checkedIn: false },
+  { id: 'omega', name: 'Lag Lords', captain: 'Heitor C.', members: 5, seed: 6, checkedIn: false },
   { id: 'quantum', name: 'Quantum Five', captain: 'Marina A.', members: 5, seed: 7, checkedIn: true },
   { id: 'vector', name: 'Vector Sul', captain: 'Igor T.', members: 5, seed: 8, checkedIn: true },
 ]
@@ -140,7 +140,7 @@ export const matches: Match[] = [
     scoreB: 8,
     status: 'finished',
     scheduledAt: 'Hoje, 18:30',
-    venue: 'Servidor UTFPR 01',
+    venue: 'Servidor 01',
   },
   {
     id: 'm2',
@@ -150,7 +150,7 @@ export const matches: Match[] = [
     teamB: 'Quantum Five',
     status: 'live',
     scheduledAt: 'Agora',
-    venue: 'Servidor UTFPR 02',
+    venue: 'Servidor 02',
   },
   {
     id: 'm3',
@@ -166,13 +166,13 @@ export const matches: Match[] = [
     id: 'm4',
     phase: 'Semifinal',
     round: 'Playoffs',
-    teamA: 'Gamma UTF',
-    teamB: 'Omega Campus',
+    teamA: 'Pixel Punks',
+    teamB: 'Lag Lords',
     scoreA: 12,
     scoreB: 12,
     status: 'contested',
     scheduledAt: '22 maio, 20:00',
-    venue: 'Servidor UTFPR 03',
+    venue: 'Servidor 03',
   },
 ]
 

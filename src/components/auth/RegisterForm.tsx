@@ -18,7 +18,7 @@ function getRegisterError(message: string) {
 }
 
 export function RegisterForm() {
-  const [avatarKey, setAvatarKey] = useState<AvatarKey>('avatar_utfpr_blue')
+  const [avatarKey, setAvatarKey] = useState<AvatarKey>('avatar_arcade_blue')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -65,7 +65,7 @@ export function RegisterForm() {
     }
 
     form.reset()
-    setAvatarKey('avatar_utfpr_blue')
+    setAvatarKey('avatar_arcade_blue')
     setSuccess(
       data.session
         ? 'Conta criada. Você já pode acessar Minha conta.'
